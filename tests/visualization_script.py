@@ -450,12 +450,25 @@ class DrakeKinematicsEnv:
             print(f"Warning: Error loading pickle file: {e}")
             return
 
+        full_detected_pcd = o3d.geometry.PointCloud()
+        for obj in results["detected_objects"]:
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(obj["point_cloud_numpy"])
+            full_detected_pcd += pcd
+        
+        visualize_pcd(
+            full_detected_pcd,
+            "Detected Objects",
+            2, 
+            True
+            )
+
         # Process detected objects
         if "detected_objects" in results:
             detected_objects = results["detected_objects"]
             if detected_objects:
                 print(f"Processing {len(detected_objects)} detected objects")
-                detected_convex_hulls = []
+                all_decomposed_meshes = []
                 
                 for i, obj in enumerate(detected_objects):
                     try:
@@ -468,33 +481,163 @@ class DrakeKinematicsEnv:
                             print(f"Warning: No point cloud data found for object {i}")
                             continue
                             
-                        if len(points) < 4:
-                            print(f"Warning: Object {i} has too few points ({len(points)}) for convex hull")
+                        if len(points) < 10:  # Need more points for mesh reconstruction
+                            print(f"Warning: Object {i} has too few points ({len(points)}) for mesh reconstruction")
                             continue
                         
-                        # swap y-z axes since this is a common problem
+                        # Swap y-z axes since this is a common problem
                         points = np.column_stack((points[:, 0], points[:, 2], -points[:, 1]))
                         # Transform points to world frame
                         transform = self.get_transform("world", "camera_center_link")
                         points = self.transform_point_cloud_with_open3d(points, transform)
                             
-                        pcd = o3d.geometry.PointCloud()
-                        pcd.points = o3d.utility.Vector3dVector(points)
-                        hull_mesh, _ = pcd.compute_convex_hull()
-                        hull_mesh.compute_vertex_normals()
-                        hull_mesh = hull_mesh.simplify_vertex_clustering(voxel_size=0.005)
-                        detected_convex_hulls.append(hull_mesh)
-                        print(f"Created convex hull for object {i} with {len(points)} points")
+                        # Use fast DBSCAN clustering + convex hulls approach
+                        clustered_hulls = self._create_clustered_convex_hulls(points, i)
+                        all_decomposed_meshes.extend(clustered_hulls)
+                        
+                        print(f"Created {len(clustered_hulls)} clustered convex hulls for object {i}")
                         
                     except Exception as e:
                         print(f"Warning: Failed to process object {i}: {e}")
                 
-                if detected_convex_hulls:
-                    self.register_convex_hulls_as_collision(detected_convex_hulls)
+                if all_decomposed_meshes:
+                    self.register_convex_hulls_as_collision(all_decomposed_meshes)
+                    print(f"Registered {len(all_decomposed_meshes)} total clustered convex hulls")
                 else:
-                    print("Warning: No valid convex hulls created from detected objects")
+                    print("Warning: No valid clustered convex hulls created from detected objects")
             else:
                 print("No detected objects found")
+
+    def _create_clustered_convex_hulls(self, points: np.ndarray, object_id: int) -> List[o3d.geometry.TriangleMesh]:
+        """
+        Create convex hulls from DBSCAN clusters of point cloud data.
+        Fast approach: cluster points, then convex hull each cluster.
+        
+        Args:
+            points: Nx3 numpy array of 3D points
+            object_id: ID for debugging/logging
+            
+        Returns:
+            List of Open3D triangle meshes (convex hulls of clusters)
+        """
+        try:
+            # Create Open3D point cloud
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            
+            # Quick outlier removal (optional, can skip for speed)
+            if len(points) > 50:  # Only for larger point clouds
+                pcd, _ = pcd.remove_statistical_outlier(nb_neighbors=10, std_ratio=2.0)
+                points = np.asarray(pcd.points)
+            
+            if len(points) < 4:
+                print(f"Warning: Too few points after filtering for object {object_id}")
+                return []
+            
+            # Try multiple DBSCAN parameter combinations to find clusters
+            clusters = []
+            labels = None
+            
+            # Calculate some basic statistics for parameter estimation
+            if len(points) > 10:
+                # Compute nearest neighbor distances for better eps estimation
+                distances = pcd.compute_nearest_neighbor_distance()
+                avg_nn_distance = np.mean(distances)
+                std_nn_distance = np.std(distances)
+                
+                # Try multiple parameter combinations
+                parameter_sets = [
+                    # (eps, min_samples) - progressively more aggressive
+                    (avg_nn_distance * 2.0, max(3, len(points) // 50)),      # Conservative
+                    (avg_nn_distance * 3.0, max(3, len(points) // 100)),     # Moderate
+                    (avg_nn_distance * 4.0, max(3, len(points) // 200)),     # Aggressive
+                    (avg_nn_distance * 6.0, 3),                              # Very aggressive
+                    (0.05, 3),                                               # Fixed small scale
+                    (0.1, 3),                                                # Fixed medium scale
+                    (0.02, 3),                                               # Fixed tiny scale
+                ]
+                
+                print(f"Object {object_id}: {len(points)} points, avg_nn_dist={avg_nn_distance:.4f}")
+                
+                for i, (eps, min_samples) in enumerate(parameter_sets):
+                    try:
+                        labels = np.array(pcd.cluster_dbscan(eps=eps, min_points=min_samples))
+                        unique_labels = np.unique(labels)
+                        clusters = unique_labels[unique_labels >= 0]  # Remove noise label (-1)
+                        
+                        noise_points = np.sum(labels == -1)
+                        clustered_points = len(points) - noise_points
+                        
+                        print(f"  Try {i+1}: eps={eps:.4f}, min_samples={min_samples} → {len(clusters)} clusters, {clustered_points}/{len(points)} points clustered")
+                        
+                        # Accept if we found clusters and most points are clustered
+                        if len(clusters) > 0 and clustered_points >= len(points) * 0.3:  # At least 30% of points clustered
+                            print(f"  ✓ Accepted parameter set {i+1}")
+                            break
+                            
+                    except Exception as e:
+                        print(f"  Try {i+1}: Failed with eps={eps:.4f}, min_samples={min_samples}: {e}")
+                        continue
+            
+            if len(clusters) == 0 or labels is None:
+                print(f"No clusters found for object {object_id} after all attempts, using entire point cloud")
+                # Fallback: use entire point cloud as single convex hull
+                hull_mesh, _ = pcd.compute_convex_hull()
+                hull_mesh.compute_vertex_normals()
+                return [hull_mesh]
+            
+            print(f"Found {len(clusters)} clusters for object {object_id} (eps={eps:.3f}, min_samples={min_samples})")
+            
+            # Create convex hull for each cluster
+            convex_hulls = []
+            for cluster_id in clusters:
+                try:
+                    # Get points for this cluster
+                    cluster_mask = labels == cluster_id
+                    cluster_points = points[cluster_mask]
+                    
+                    if len(cluster_points) < 4:
+                        print(f"Skipping cluster {cluster_id} with only {len(cluster_points)} points")
+                        continue
+                    
+                    # Create point cloud for this cluster
+                    cluster_pcd = o3d.geometry.PointCloud()
+                    cluster_pcd.points = o3d.utility.Vector3dVector(cluster_points)
+                    
+                    # Compute convex hull
+                    hull_mesh, _ = cluster_pcd.compute_convex_hull()
+                    hull_mesh.compute_vertex_normals()
+                    
+                    # Validate hull
+                    if len(np.asarray(hull_mesh.vertices)) >= 4 and len(np.asarray(hull_mesh.triangles)) >= 4:
+                        convex_hulls.append(hull_mesh)
+                        print(f"  Cluster {cluster_id}: {len(cluster_points)} points → convex hull with {len(np.asarray(hull_mesh.vertices))} vertices")
+                    else:
+                        print(f"  Skipping degenerate hull for cluster {cluster_id}")
+                        
+                except Exception as e:
+                    print(f"Error processing cluster {cluster_id} for object {object_id}: {e}")
+            
+            if not convex_hulls:
+                print(f"No valid convex hulls created for object {object_id}, using entire point cloud")
+                # Fallback: use entire point cloud as single convex hull
+                hull_mesh, _ = pcd.compute_convex_hull()
+                hull_mesh.compute_vertex_normals()
+                return [hull_mesh]
+            
+            return convex_hulls
+            
+        except Exception as e:
+            print(f"Error in DBSCAN clustering for object {object_id}: {e}")
+            # Final fallback: single convex hull
+            try:
+                pcd = o3d.geometry.PointCloud()
+                pcd.points = o3d.utility.Vector3dVector(points)
+                hull_mesh, _ = pcd.compute_convex_hull()
+                hull_mesh.compute_vertex_normals()
+                return [hull_mesh]
+            except:
+                return []
 
     def _set_initial_configuration(self):
         """Set the robot to a reasonable initial joint configuration"""
