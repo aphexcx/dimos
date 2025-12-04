@@ -26,7 +26,7 @@ from .stream_processor import (
     StreamProcessorPipeline,
     get_processor_registry,
     register_processor,
-    create_processor
+    create_processor,
 )
 
 # Import processors package to trigger dynamic loading
@@ -34,11 +34,11 @@ from . import processors
 
 __all__ = [
     "StreamProcessor",
-    "PassthroughProcessor", 
+    "PassthroughProcessor",
     "StreamProcessorRegistry",
     "StreamProcessorPipeline",
     "get_processor_registry",
     "register_processor",
     "create_processor",
-    "processors"
+    "processors",
 ]

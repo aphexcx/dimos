@@ -141,10 +141,10 @@ class UnitreeGo2(Robot):
         # Initialize stream processing pipeline if enabled
         self.stream_pipeline = None
         self.processed_streams = {}
-        
+
         if self.video_stream is not None:
             self.video_stream_ros = self.get_ros_video_stream(fps=8)
-            
+
             # Initialize stream processors based on configuration
             if stream_processors:
                 self._initialize_stream_processors(stream_processors, processor_configs or {})
@@ -173,69 +173,77 @@ class UnitreeGo2(Robot):
         # Create the visualization stream at 5Hz
         self.local_planner_viz_stream = self.local_planner.create_stream(frequency_hz=5.0)
 
-    def _initialize_stream_processors(self, processor_names: List[str], processor_configs: Dict[str, Dict[str, Any]]):
+    def _initialize_stream_processors(
+        self, processor_names: List[str], processor_configs: Dict[str, Dict[str, Any]]
+    ):
         """Initialize stream processors based on configuration.
-        
+
         Args:
             processor_names: List of processor names to initialize
             processor_configs: Configuration dictionary for each processor
         """
         logger.info(f"Initializing stream processors: {processor_names}")
-        
+
         # Check which processors are available
         loaded_processors = get_loaded_processors()
-        logger.info(f"Available processors: {[name for name, loaded in loaded_processors.items() if loaded]}")
-        
+        logger.info(
+            f"Available processors: {[name for name, loaded in loaded_processors.items() if loaded]}"
+        )
+
         # Create pipeline
         self.stream_pipeline = StreamProcessorPipeline("unitree_go2_pipeline")
-        
+
         # Default camera configuration
         default_camera_config = {
             "camera_intrinsics": self.camera_intrinsics,
             "camera_pitch": self.camera_pitch,
             "camera_height": self.camera_height,
-            "device": "cpu"  # Default to CPU for compatibility
+            "device": "cpu",  # Default to CPU for compatibility
         }
-        
+
         # Add processors to pipeline
         for processor_name in processor_names:
             if not is_processor_available(processor_name):
-                logger.warning(f"Processor '{processor_name}' is not available (missing dependencies)")
+                logger.warning(
+                    f"Processor '{processor_name}' is not available (missing dependencies)"
+                )
                 continue
-                
+
             try:
                 # Merge default config with user config
                 config = default_camera_config.copy()
                 if processor_name in processor_configs:
                     config.update(processor_configs[processor_name])
-                
+
                 # Create processor
                 processor = create_processor(
-                    processor_type=processor_name,
-                    name=f"{processor_name}_processor",
-                    config=config
+                    processor_type=processor_name, name=f"{processor_name}_processor", config=config
                 )
-                
+
                 # Add to pipeline
                 self.stream_pipeline.add_processor(processor)
                 logger.info(f"Added processor: {processor_name}")
-                
+
             except Exception as e:
                 logger.error(f"Failed to initialize processor '{processor_name}': {e}")
-        
+
         # Create processed stream if we have processors
         if self.stream_pipeline.processors:
-            self.processed_streams["main"] = self.stream_pipeline.create_stream(self.video_stream_ros)
-            logger.info(f"Created main processed stream with {len(self.stream_pipeline.processors)} processors")
+            self.processed_streams["main"] = self.stream_pipeline.create_stream(
+                self.video_stream_ros
+            )
+            logger.info(
+                f"Created main processed stream with {len(self.stream_pipeline.processors)} processors"
+            )
         else:
             logger.warning("No stream processors were successfully initialized")
 
     def get_processed_stream(self, stream_name: str = "main"):
         """Get a processed stream by name.
-        
+
         Args:
             stream_name: Name of the processed stream
-            
+
         Returns:
             Observable stream or None if not available
         """
@@ -243,7 +251,7 @@ class UnitreeGo2(Robot):
 
     def get_available_processors(self) -> Dict[str, bool]:
         """Get information about available stream processors.
-        
+
         Returns:
             Dictionary mapping processor names to availability status
         """
@@ -270,9 +278,9 @@ class UnitreeGo2(Robot):
         # Clean up stream processors
         if self.stream_pipeline:
             self.stream_pipeline.cleanup()
-        
+
         # Clean up processed streams
         self.processed_streams.clear()
-        
+
         # Call parent cleanup
         super().cleanup()

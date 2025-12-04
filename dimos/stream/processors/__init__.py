@@ -29,12 +29,12 @@ logger = logging.getLogger(__name__)
 
 def try_import_processor(module_name: str, class_name: str, processor_name: str) -> bool:
     """Try to import and register a processor if dependencies are available.
-    
+
     Args:
         module_name: Name of the module to import from
         class_name: Name of the class to import
         processor_name: Name to register the processor under
-        
+
     Returns:
         bool: True if processor was successfully imported and registered
     """
@@ -54,41 +54,41 @@ def try_import_processor(module_name: str, class_name: str, processor_name: str)
 
 def load_optional_processors() -> Dict[str, bool]:
     """Load all optional processors that have their dependencies available.
-    
+
     Returns:
         Dict mapping processor names to whether they were successfully loaded
     """
     results = {}
-    
+
     # Try to load person tracking processor (requires YOLO)
     results["person_tracking"] = try_import_processor(
         "person_tracking", "PersonTrackingProcessor", "person_tracking"
     )
-    
+
     # Try to load object tracking processor (requires Metric3D)
     results["object_tracking"] = try_import_processor(
         "object_tracking", "ObjectTrackingProcessor", "object_tracking"
     )
-    
+
     # Try to load depth estimation processor (requires Metric3D)
     results["depth_estimation"] = try_import_processor(
         "depth_estimation", "DepthEstimationProcessor", "depth_estimation"
     )
-    
+
     # Try to load semantic segmentation processor (requires FastSAM)
     results["semantic_segmentation"] = try_import_processor(
         "semantic_segmentation", "SemanticSegmentationProcessor", "semantic_segmentation"
     )
-    
+
     # Try to load object detection processor (requires YOLO)
     results["object_detection"] = try_import_processor(
         "object_detection", "ObjectDetectionProcessor", "object_detection"
     )
-    
+
     loaded_count = sum(results.values())
     total_count = len(results)
     logger.info(f"Loaded {loaded_count}/{total_count} optional processors")
-    
+
     return results
 
 
@@ -98,7 +98,7 @@ _loaded_processors = load_optional_processors()
 
 def get_loaded_processors() -> Dict[str, bool]:
     """Get information about which processors were successfully loaded.
-    
+
     Returns:
         Dict mapping processor names to whether they were loaded
     """
@@ -107,10 +107,10 @@ def get_loaded_processors() -> Dict[str, bool]:
 
 def is_processor_available(processor_name: str) -> bool:
     """Check if a specific processor is available.
-    
+
     Args:
         processor_name: Name of the processor to check
-        
+
     Returns:
         bool: True if processor is available
     """
