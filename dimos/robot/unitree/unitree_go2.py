@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import multiprocessing
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, Dict, List
 import numpy as np
 from dimos.robot.robot import Robot
 from dimos.robot.unitree.unitree_skills import MyUnitreeSkills
@@ -26,11 +26,13 @@ import os
 from dimos.robot.unitree.unitree_ros_control import UnitreeROSControl
 from reactivex.scheduler import ThreadPoolScheduler
 from dimos.utils.logging_config import setup_logger
-from dimos.perception.person_tracker import PersonTrackingStream
-from dimos.perception.object_tracker import ObjectTrackingStream
 from dimos.robot.local_planner import VFHPurePursuitPlanner, navigate_path_local
 from dimos.robot.global_planner.planner import AstarPlanner
 from dimos.types.costmap import Costmap
+
+# Import stream plugin architecture
+from dimos.stream import StreamConfig, stream_registry
+from dimos.stream.plugins import PersonTrackingPlugin, ObjectTrackingPlugin
 
 # Set up logging
 logger = setup_logger("dimos.robot.unitree.unitree_go2", level=logging.DEBUG)
@@ -54,6 +56,8 @@ class UnitreeGo2(Robot):
         mock_connection: bool = False,
         skills: Optional[Union[MyUnitreeSkills, AbstractSkill]] = None,
         new_memory: bool = False,
+        stream_configs: Optional[List[StreamConfig]] = None,
+        force_cpu: bool = False,
     ):
         """Initialize the UnitreeGo2 robot.
 
@@ -68,9 +72,9 @@ class UnitreeGo2(Robot):
             disable_video_stream: Whether to disable the video stream
             mock_connection: Whether to mock the connection to the robot
             skills: Skills library or custom skill implementation. Default is MyUnitreeSkills() if None.
-            spatial_memory_dir: Directory for storing spatial memory data. If None, uses output_dir/spatial_memory.
-            spatial_memory_collection: Name of the collection in the ChromaDB database.
             new_memory: If True, creates a new spatial memory from scratch.
+            stream_configs: List of StreamConfig objects for perception streams. If None, defaults are used.
+            force_cpu: If True, forces all streams to use CPU regardless of configuration.
         """
         print(f"Initializing UnitreeGo2 with use_ros: {use_ros} and use_webrtc: {use_webrtc}")
         if not (use_ros ^ use_webrtc):  # XOR operator ensures exactly one is True
@@ -113,6 +117,7 @@ class UnitreeGo2(Robot):
         self.ip = ip
         self.disposables = CompositeDisposable()
         self.main_stream_obs = None
+        self.force_cpu = force_cpu
 
         # Initialize thread pool scheduler
         self.optimal_thread_count = multiprocessing.cpu_count()
@@ -136,24 +141,8 @@ class UnitreeGo2(Robot):
         else:
             self.video_stream = None
 
-        # Initialize visual servoing if enabled
-        if self.video_stream is not None:
-            self.video_stream_ros = self.get_ros_video_stream(fps=8)
-            self.person_tracker = PersonTrackingStream(
-                camera_intrinsics=self.camera_intrinsics,
-                camera_pitch=self.camera_pitch,
-                camera_height=self.camera_height,
-            )
-            self.object_tracker = ObjectTrackingStream(
-                camera_intrinsics=self.camera_intrinsics,
-                camera_pitch=self.camera_pitch,
-                camera_height=self.camera_height,
-            )
-            person_tracking_stream = self.person_tracker.create_stream(self.video_stream_ros)
-            object_tracking_stream = self.object_tracker.create_stream(self.video_stream_ros)
-
-            self.person_tracking_stream = person_tracking_stream
-            self.object_tracking_stream = object_tracking_stream
+        # Initialize perception streams using plugin architecture
+        self._initialize_perception_streams(stream_configs)
 
         # Initialize the local planner and create BEV visualization stream
         self.local_planner = VFHPurePursuitPlanner(
@@ -179,6 +168,89 @@ class UnitreeGo2(Robot):
         # Create the visualization stream at 5Hz
         self.local_planner_viz_stream = self.local_planner.create_stream(frequency_hz=5.0)
 
+    def _initialize_perception_streams(self, stream_configs: Optional[List[StreamConfig]] = None):
+        """Initialize perception streams using the plugin architecture.
+        
+        Args:
+            stream_configs: List of StreamConfig objects. If None, uses default configurations.
+        """
+        # Register available stream plugins
+        stream_registry.register_stream_class("person_tracking", PersonTrackingPlugin)
+        stream_registry.register_stream_class("object_tracking", ObjectTrackingPlugin)
+        
+        # Use provided configs or create defaults
+        if stream_configs is None:
+            # Default configurations
+            stream_configs = []
+            
+            # Only add perception streams if video is available
+            if self.video_stream is not None:
+                # Person tracking configuration
+                person_config = StreamConfig(
+                    name="person_tracking",
+                    enabled=True,
+                    device="cuda" if not self.force_cpu else "cpu",
+                    parameters={
+                        "camera_intrinsics": self.camera_intrinsics,
+                        "camera_pitch": self.camera_pitch,
+                        "camera_height": self.camera_height,
+                        "model_path": "yolo11n.pt",
+                    },
+                    priority=10,  # Higher priority for person tracking
+                )
+                stream_configs.append(person_config)
+                
+                # Object tracking configuration
+                object_config = StreamConfig(
+                    name="object_tracking",
+                    enabled=True,
+                    device="cuda" if not self.force_cpu else "cpu",
+                    parameters={
+                        "camera_intrinsics": self.camera_intrinsics,
+                        "camera_pitch": self.camera_pitch,
+                        "camera_height": self.camera_height,
+                        "use_depth_model": not self.force_cpu,  # Disable depth on CPU
+                    },
+                    priority=5,
+                )
+                stream_configs.append(object_config)
+        
+        # Configure all streams
+        for config in stream_configs:
+            try:
+                stream_registry.configure_stream(config)
+            except ValueError as e:
+                logger.warning(f"Failed to configure stream {config.name}: {e}")
+        
+        # Initialize all configured streams
+        self.perception_streams = stream_registry.initialize_streams(force_cpu=self.force_cpu)
+        
+        # Create stream observables if video is available
+        if self.video_stream is not None and self.perception_streams:
+            self.video_stream_ros = self.get_ros_video_stream(fps=8)
+            
+            # Get initialized stream instances and create observables
+            person_tracker = stream_registry.get_stream("person_tracking")
+            if person_tracker and person_tracker.is_initialized:
+                self.person_tracking_stream = person_tracker.create_stream(self.video_stream_ros)
+                logger.info("Person tracking stream created")
+            else:
+                self.person_tracking_stream = None
+                logger.warning("Person tracking stream not available")
+            
+            object_tracker = stream_registry.get_stream("object_tracking")
+            if object_tracker and object_tracker.is_initialized:
+                self.object_tracking_stream = object_tracker.create_stream(self.video_stream_ros)
+                logger.info("Object tracking stream created")
+            else:
+                self.object_tracking_stream = None
+                logger.warning("Object tracking stream not available")
+        else:
+            self.person_tracking_stream = None
+            self.object_tracking_stream = None
+            if self.video_stream is None:
+                logger.info("No video stream available, perception streams disabled")
+
     def get_skills(self) -> Optional[SkillLibrary]:
         return self.skill_library
 
@@ -194,3 +266,24 @@ class UnitreeGo2(Robot):
         [position, rotation] = self.ros_control.transform_euler("base_link")
 
         return position, rotation
+    
+    def get_perception_streams(self) -> Dict[str, any]:
+        """Get all available perception streams.
+        
+        Returns:
+            Dictionary mapping stream names to their observables
+        """
+        streams = {}
+        if self.person_tracking_stream is not None:
+            streams["person_tracking"] = self.person_tracking_stream
+        if self.object_tracking_stream is not None:
+            streams["object_tracking"] = self.object_tracking_stream
+        return streams
+    
+    def cleanup(self):
+        """Clean up resources including perception streams."""
+        # Clean up perception streams
+        stream_registry.cleanup_all()
+        
+        # Call parent cleanup
+        super().cleanup()

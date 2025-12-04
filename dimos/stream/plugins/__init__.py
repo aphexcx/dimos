@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unitree robot implementations."""
+"""Stream plugin implementations."""
 
-from .unitree_go2 import UnitreeGo2
+from .person_tracking_plugin import PersonTrackingPlugin
+from .object_tracking_plugin import ObjectTrackingPlugin
 
-__all__ = ["UnitreeGo2"]
+__all__ = [
+    "PersonTrackingPlugin",
+    "ObjectTrackingPlugin",
+]
