@@ -65,17 +65,19 @@ class ClaudeAgent(LLMAgent):
         pool_scheduler: Optional[ThreadPoolScheduler] = None,
         process_all_inputs: Optional[bool] = None,
         thinking_budget_tokens: Optional[int] = 2000,
-        anthropic_client = None,
+        anthropic_client=None,
     ):
         # Determine appropriate default for process_all_inputs if not provided
         if process_all_inputs is None:
-            process_all_inputs = True if input_query_stream is not None and input_video_stream is None else False
+            process_all_inputs = (
+                True if input_query_stream is not None and input_video_stream is None else False
+            )
 
         # Create Claude adapter
         api_adapter = ClaudeAdapter(
-            model_name=model_name, 
+            model_name=model_name,
             client=anthropic_client,
-            thinking_budget=thinking_budget_tokens or 0
+            thinking_budget=thinking_budget_tokens or 0,
         )
 
         super().__init__(
@@ -92,7 +94,7 @@ class ClaudeAgent(LLMAgent):
             max_output_tokens_per_request=max_output_tokens_per_request,
             max_input_tokens_per_request=max_input_tokens_per_request,
         )
-        
+
         self.query = query
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -121,18 +123,32 @@ class ClaudeAgent(LLMAgent):
 
         # Ensure only one input stream is provided
         if self.input_video_stream is not None and self.input_query_stream is not None:
-            raise ValueError("More than one input stream provided. Please provide only one input stream.")
+            raise ValueError(
+                "More than one input stream provided. Please provide only one input stream."
+            )
 
         logger.info("Claude Agent Initialized.")
 
     def _add_context_to_memory(self):
         """Adds initial context to the agent's memory."""
         context_data = [
-            ("id0", "Optical Flow is a technique used to track the movement of objects in a video sequence."),
-            ("id1", "Edge Detection is a technique used to identify the boundaries of objects in an image."),
+            (
+                "id0",
+                "Optical Flow is a technique used to track the movement of objects in a video sequence.",
+            ),
+            (
+                "id1",
+                "Edge Detection is a technique used to identify the boundaries of objects in an image.",
+            ),
             ("id2", "Video is a sequence of frames captured at regular intervals."),
-            ("id3", "Colors in Optical Flow are determined by the movement of light, and can be used to track the movement of objects."),
-            ("id4", "Json is a data interchange format that is easy for humans to read and write, and easy for machines to parse and generate."),
+            (
+                "id3",
+                "Colors in Optical Flow are determined by the movement of light, and can be used to track the movement of objects.",
+            ),
+            (
+                "id4",
+                "Json is a data interchange format that is easy for humans to read and write, and easy for machines to parse and generate.",
+            ),
         ]
         for doc_id, text in context_data:
             self.agent_memory.add_vector(doc_id, text)

@@ -48,10 +48,10 @@ from dimos.agents.prompt_builder.impl import PromptBuilder
 from dimos.agents.tokenizer.base import AbstractTokenizer
 from dimos.agents.tokenizer.openai_tokenizer import OpenAITokenizer
 from dimos.agents.api_adapters import (
-    AbstractAPIAdapter, 
-    UnifiedMessage, 
+    AbstractAPIAdapter,
+    UnifiedMessage,
     UnifiedResponse,
-    AgentCapabilities
+    AgentCapabilities,
 )
 from dimos.skills.skills import AbstractSkill, SkillLibrary
 from dimos.stream.frame_processor import FrameProcessor
@@ -179,14 +179,14 @@ class LLMAgent(Agent):
             api_adapter (AbstractAPIAdapter): The API adapter for provider-specific operations.
         """
         super().__init__(dev_name, agent_type, agent_memory, pool_scheduler)
-        
+
         # API adapter for provider-specific operations
         self.api_adapter = api_adapter
-        
+
         # Global conversation history with thread safety
         self.conversation_history: List[UnifiedMessage] = []
         self._history_lock = threading.Lock()
-        
+
         # These attributes can be configured by a subclass if needed.
         self.query: Optional[str] = None
         self.prompt_builder: Optional[PromptBuilder] = None
@@ -269,7 +269,9 @@ class LLMAgent(Agent):
         """Add a message to the conversation history in a thread-safe manner."""
         with self._history_lock:
             self.conversation_history.append(message)
-            logger.info(f"Added {message.role} message to conversation history (now has {len(self.conversation_history)} messages)")
+            logger.info(
+                f"Added {message.role} message to conversation history (now has {len(self.conversation_history)} messages)"
+            )
 
     def reset_conversation_history(self):
         """Reset the conversation history."""
@@ -331,36 +333,34 @@ class LLMAgent(Agent):
             List[UnifiedMessage]: Messages in unified format.
         """
         messages = self._get_conversation_messages()
-        
+
         # Add system message if not already in history
         if self.system_query and (not messages or messages[0].role != "system"):
             messages.insert(0, UnifiedMessage(role="system", content=self.system_query))
-        
+
         # Create user message with query and optional RAG context
         user_content = self.query
         if condensed_results:
             user_content = f"{condensed_results}\n\n{self.query}"
-            
+
         # Handle images if provided
         images = None
         if base64_image:
             images = [base64_image] if isinstance(base64_image, str) else base64_image
-            
-        user_message = UnifiedMessage(
-            role="user",
-            content=user_content,
-            images=images
-        )
-        
+
+        user_message = UnifiedMessage(role="user", content=user_content, images=images)
+
         messages.append(user_message)
-        
+
         # Validate messages based on capabilities
         if self.api_adapter:
             messages = self.api_adapter.validate_request(messages)
-            
+
         return messages
 
-    def _handle_tooling(self, response: UnifiedResponse, messages: List[UnifiedMessage]) -> Optional[UnifiedResponse]:
+    def _handle_tooling(
+        self, response: UnifiedResponse, messages: List[UnifiedMessage]
+    ) -> Optional[UnifiedResponse]:
         """Handles tooling callbacks in the response.
 
         If tool calls are present, the corresponding functions are executed and
@@ -375,7 +375,7 @@ class LLMAgent(Agent):
         """
         if not response.tool_calls or not self.skill_library:
             return None
-            
+
         # Execute tool calls
         new_messages = []
         for tool_call in response.tool_calls:
@@ -383,29 +383,24 @@ class LLMAgent(Agent):
             args = json.loads(tool_call["function"]["arguments"])
             result = self.skill_library.call(name, **args)
             logger.info(f"Function Call Results: {result}")
-            
+
             tool_message = UnifiedMessage(
-                role="tool",
-                tool_call_id=tool_call["id"],
-                content=str(result),
-                name=name
+                role="tool", tool_call_id=tool_call["id"], content=str(result), name=name
             )
             new_messages.append(tool_message)
-            
+
         if new_messages:
             logger.info("Sending follow-up query with tool results.")
             # Add the assistant response and tool results to messages
             assistant_message = UnifiedMessage(
-                role="assistant",
-                content=response.content,
-                tool_calls=response.tool_calls
+                role="assistant", content=response.content, tool_calls=response.tool_calls
             )
             messages.append(assistant_message)
             messages.extend(new_messages)
-            
+
             # Send another query
             return self._send_query(messages)
-            
+
         return None
 
     def _observable_query(
@@ -432,34 +427,36 @@ class LLMAgent(Agent):
             # Check if images are supported
             capabilities = self.get_capabilities()
             if base64_image and not capabilities.supports_images:
-                logger.warning(f"Model {self.api_adapter.model_name} does not support images. Skipping image input.")
+                logger.warning(
+                    f"Model {self.api_adapter.model_name} does not support images. Skipping image input."
+                )
                 base64_image = None
-                
+
             self._update_query(incoming_query)
             _, condensed_results = self._get_rag_context()
             messages = self._build_prompt(
                 base64_image, dimensions, override_token_limit, condensed_results
             )
-            
+
             logger.info("Sending Query.")
             response = self._send_query(messages)
             logger.info(f"Received Response: {response}")
-            
+
             if response is None:
                 raise Exception("Response does not exist.")
-                
+
             # Handle tool calls if present
             if response.tool_calls and self.skill_library and self.skill_library.get_tools():
                 final_response = self._handle_tooling(response, messages)
                 if final_response:
                     response = final_response
-                    
+
             # Emit the final response
             final_content = response.content or str(response)
             observer.on_next(final_content)
             self.response_subject.on_next(final_content)
             observer.on_completed()
-            
+
             # Add messages to conversation history after successful completion
             # This ensures history is only updated when the full exchange is complete
             with self._history_lock:
@@ -468,16 +465,18 @@ class LLMAgent(Agent):
                     user_msg = messages[-1]  # Last message should be the user message
                     if user_msg not in self.conversation_history:
                         self.conversation_history.append(user_msg)
-                
+
                 # Add the assistant response
                 assistant_msg = UnifiedMessage(
                     role="assistant",
                     content=response.content,
                     tool_calls=response.tool_calls,
-                    thinking_content=response.thinking_blocks[0] if response.thinking_blocks else None
+                    thinking_content=response.thinking_blocks[0]
+                    if response.thinking_blocks
+                    else None,
                 )
                 self.conversation_history.append(assistant_msg)
-                
+
         except Exception as e:
             logger.error(f"Query failed in {self.dev_name}: {e}")
             observer.on_error(e)
@@ -496,28 +495,29 @@ class LLMAgent(Agent):
             NotImplementedError: If no API adapter is configured.
         """
         if not self.api_adapter:
-            raise NotImplementedError("No API adapter configured. Subclasses must provide an API adapter.")
-            
+            raise NotImplementedError(
+                "No API adapter configured. Subclasses must provide an API adapter."
+            )
+
         # Convert messages to provider-specific format
         provider_messages = self.api_adapter.convert_messages(
-            messages, 
-            image_detail=self.image_detail
+            messages, image_detail=self.image_detail
         )
-        
+
         # Convert tools if available
         tools = None
         if self.skill_library and self.skill_library.get_tools():
             tools = self.api_adapter.convert_tools(self.skill_library.get_tools())
-            
+
         # Send request via adapter
         response = self.api_adapter.send_request(
             provider_messages,
             tools=tools,
             max_tokens=self.max_output_tokens_per_request,
             temperature=0,
-            response_model=getattr(self, 'response_model', None)
+            response_model=getattr(self, "response_model", None),
         )
-        
+
         return response
 
     def _log_response_to_file(self, response, output_dir: str = None):
@@ -827,7 +827,7 @@ class OpenAIAgent(LLMAgent):
 
         # Import OpenAI adapter
         from dimos.agents.api_adapters import OpenAIAdapter
-        
+
         # Create OpenAI adapter
         api_adapter = OpenAIAdapter(model_name=model_name, client=openai_client)
 
@@ -845,7 +845,7 @@ class OpenAIAgent(LLMAgent):
             max_output_tokens_per_request=max_output_tokens_per_request,
             max_input_tokens_per_request=max_input_tokens_per_request,
         )
-        
+
         self.query = query
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -901,8 +901,6 @@ class OpenAIAgent(LLMAgent):
         ]
         for doc_id, text in context_data:
             self.agent_memory.add_vector(doc_id, text)
-
-
 
 
 # endregion OpenAIAgent Subclass (OpenAI-Specific Implementation)
