@@ -66,7 +66,7 @@ class RefactoredClaudeAgent(BaseLLMAgent):
     ):
         """
         Initialize the refactored Claude agent.
-        
+
         Args:
             dev_name: The device name of the agent.
             agent_type: The type of the agent.
@@ -118,13 +118,13 @@ class RefactoredClaudeAgent(BaseLLMAgent):
         self.query = query
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
-        
+
         self.model_name = model_name
         self.rag_query_n = rag_query_n
         self.rag_similarity_threshold = rag_similarity_threshold
         self.image_detail = image_detail
         self.thinking_budget_tokens = thinking_budget_tokens
-        
+
         # Initialize provider
         self.llm_provider = ClaudeProvider(
             model_name=model_name,
@@ -132,9 +132,9 @@ class RefactoredClaudeAgent(BaseLLMAgent):
             max_tokens=max_output_tokens_per_request,
             thinking_budget_tokens=thinking_budget_tokens,
         )
-        
+
         self.frame_processor = frame_processor or FrameProcessor(delete_on_init=True)
-        
+
         # Ensure only one input stream is provided
         if self.input_video_stream is not None and self.input_query_stream is not None:
             raise ValueError(
@@ -155,13 +155,13 @@ class RefactoredClaudeAgent(BaseLLMAgent):
                 "Computer Vision is a field of artificial intelligence that trains computers to interpret and understand the visual world.",
             ),
         ]
-        
+
         for doc_id, content in context_data:
             try:
                 # Use the appropriate method for adding to memory
-                if hasattr(self.agent_memory, 'add_vector'):
+                if hasattr(self.agent_memory, "add_vector"):
                     self.agent_memory.add_vector(doc_id, content)
-                elif hasattr(self.agent_memory, 'add'):
+                elif hasattr(self.agent_memory, "add"):
                     self.agent_memory.add(doc_id, content)
             except Exception as memory_error:
                 logger.warning(f"Failed to add context {doc_id}: {memory_error}")
@@ -171,71 +171,71 @@ class RefactoredClaudeAgent(BaseLLMAgent):
         query_text: str,
         base64_image: Optional[str] = None,
         dimensions: Optional[Tuple[int, int]] = None,
-        **kwargs
+        **kwargs,
     ) -> Observable:
         """Create an observable for processing a query."""
+
         def _observable_query(observer: Observer):
             try:
                 # Update query
                 self.query = query_text
-                
+
                 # Get RAG context
                 rag_results, system_prompt = self._get_rag_context(query_text)
-                
+
                 # Build messages
                 messages = self._build_messages(
                     query_text, base64_image, dimensions, rag_results, system_prompt
                 )
-                
+
                 # Get tools if available
                 tools = None
                 if self.skill_library:
                     tools = self.skill_library.get_tools()
-                
+
                 # Send query to provider
                 if self.llm_provider is None:
                     raise RuntimeError("LLM provider not initialized")
-                response = self.llm_provider.send_query(
-                    messages, tools, **kwargs
-                )
-                
+                response = self.llm_provider.send_query(messages, tools, **kwargs)
+
                 # Add response to conversation history
                 assistant_message = Message(
                     role="assistant",
                     content=response.content,
-                    tool_calls=[tc.__dict__ for tc in response.tool_calls] if response.tool_calls else None
+                    tool_calls=[tc.__dict__ for tc in response.tool_calls]
+                    if response.tool_calls
+                    else None,
                 )
                 self.conversation_manager.add_message(assistant_message)
-                
+
                 # Handle tool calls if any
                 if response.tool_calls:
                     tool_responses = self._handle_tool_calls(response)
                     if tool_responses:
                         self.conversation_manager.add_messages(tool_responses)
-                        
+
                         # Make follow-up call with tool results
                         follow_up_messages = messages + [assistant_message] + tool_responses
                         follow_up_response = self.llm_provider.send_query(
                             follow_up_messages, tools, **kwargs
                         )
-                        
+
                         # Add final response to conversation history
                         final_message = Message(
-                            role="assistant",
-                            content=follow_up_response.content
+                            role="assistant", content=follow_up_response.content
                         )
                         self.conversation_manager.add_message(final_message)
-                        
+
                         observer.on_next(final_message.content)
                 else:
                     observer.on_next(response.content)
-                
+
                 observer.on_completed()
-                
+
             except Exception as e:
                 logger.error(f"Error in observable query: {e}")
                 observer.on_error(e)
-        
+
         return create(_observable_query)
 
     def _build_messages(
@@ -244,109 +244,108 @@ class RefactoredClaudeAgent(BaseLLMAgent):
         base64_image: Optional[str],
         dimensions: Optional[Tuple[int, int]],
         rag_results: str,
-        system_prompt: str
+        system_prompt: str,
     ) -> list[Message]:
         """Build messages for the LLM provider."""
         messages = []
-        
+
         # Add system message if provided (Claude handles this differently)
         if system_prompt:
             messages.append(Message(role="system", content=system_prompt))
-        
+
         # Add conversation history
         history = self.conversation_manager.get_recent_messages(10)  # Last 10 messages
         messages.extend(history)
-        
+
         # Build user message
         user_content = query_text
         if rag_results:
             user_content = f"{rag_results}\n\n{query_text}"
-        
+
         user_message = Message(role="user", content=user_content)
         messages.append(user_message)
-        
+
         return messages
 
     def subscribe_to_image_processing(
         self, frame_observable: Observable, query_extractor=None
     ) -> Disposable:
         """Subscribe to image processing stream."""
+
         def _process_frame(emission) -> Observable:
             try:
                 frame = emission
                 if frame is None:
                     return create(lambda obs: obs.on_completed())
-                
+
                 # Use frame directly (FrameProcessor doesn't have process_frame method)
                 processed_frame = frame
                 if processed_frame is None:
                     return create(lambda obs: obs.on_completed())
-                
+
                 # Convert to base64
                 import base64
                 import cv2
-                _, buffer = cv2.imencode('.jpg', processed_frame)
-                base64_image = base64.b64encode(buffer).decode('utf-8')
-                
+
+                _, buffer = cv2.imencode(".jpg", processed_frame)
+                base64_image = base64.b64encode(buffer).decode("utf-8")
+
                 # Extract query if provided
                 query = self.query
                 if query_extractor:
                     query = query_extractor(processed_frame)
-                
+
                 # Run observable query
                 return self.run_observable_query(
                     query, base64_image, processed_frame.shape[:2][::-1]
                 )
-                
+
             except Exception as e:
                 logger.error(f"Error processing frame: {e}")
                 return create(lambda obs: obs.on_error(e))
-        
+
         def process_if_free(emission):
-            if self.process_all_inputs or not hasattr(self, '_processing'):
+            if self.process_all_inputs or not hasattr(self, "_processing"):
                 self._processing = True
                 return _process_frame(emission).pipe(
-                    RxOps.finalize(lambda: setattr(self, '_processing', False))
+                    RxOps.finalize(lambda: setattr(self, "_processing", False))
                 )
             else:
                 return create(lambda obs: obs.on_completed())
-        
-        subscription = frame_observable.pipe(
-            RxOps.flat_map(process_if_free)
-        ).subscribe(
+
+        subscription = frame_observable.pipe(RxOps.flat_map(process_if_free)).subscribe(
             on_next=lambda response: self.response_subject.on_next(response),
             on_error=lambda e: logger.error(f"Error in image processing: {e}"),
-            on_completed=lambda: logger.info("Image processing completed")
+            on_completed=lambda: logger.info("Image processing completed"),
         )
-        
+
         return subscription
 
     def subscribe_to_query_processing(self, query_observable: Observable) -> Disposable:
         """Subscribe to query processing stream."""
+
         def _process_query(query) -> Observable:
             try:
                 return self.run_observable_query(query)
             except Exception as e:
                 logger.error(f"Error processing query: {e}")
                 return create(lambda obs: obs.on_error(e))
-        
+
         def process_if_free(query):
-            if self.process_all_inputs or not hasattr(self, '_processing'):
+            if self.process_all_inputs or not hasattr(self, "_processing"):
                 self._processing = True
                 return _process_query(query).pipe(
-                    RxOps.finalize(lambda: setattr(self, '_processing', False))
+                    RxOps.finalize(lambda: setattr(self, "_processing", False))
                 )
             else:
                 return create(lambda obs: obs.on_completed())
-        
-        subscription = query_observable.pipe(
-            RxOps.flat_map(process_if_free)
-        ).subscribe(
+
+        subscription = query_observable.pipe(RxOps.flat_map(process_if_free)).subscribe(
             on_next=lambda response: self.response_subject.on_next(response),
             on_error=lambda e: logger.error(f"Error in query processing: {e}"),
-            on_completed=lambda: logger.info("Query processing completed")
+            on_completed=lambda: logger.info("Query processing completed"),
         )
-        
+
         return subscription
 
     def get_response_observable(self) -> Observable:
@@ -356,5 +355,5 @@ class RefactoredClaudeAgent(BaseLLMAgent):
     def dispose_all(self):
         """Dispose of all resources."""
         super().dispose_all()
-        if hasattr(self, 'response_subject'):
+        if hasattr(self, "response_subject"):
             self.response_subject.dispose()
