@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import os
 import threading
-from typing import Any, Tuple, Optional, Union
+from typing import Any, Tuple, Optional, Union, List
 
 # Third-party imports
 from dotenv import load_dotenv
@@ -47,6 +47,12 @@ from dimos.agents.memory.chroma_impl import OpenAISemanticMemory
 from dimos.agents.prompt_builder.impl import PromptBuilder
 from dimos.agents.tokenizer.base import AbstractTokenizer
 from dimos.agents.tokenizer.openai_tokenizer import OpenAITokenizer
+from dimos.agents.api_adapters import (
+    AbstractAPIAdapter, 
+    UnifiedMessage, 
+    UnifiedResponse,
+    AgentCapabilities
+)
 from dimos.skills.skills import AbstractSkill, SkillLibrary
 from dimos.stream.frame_processor import FrameProcessor
 from dimos.stream.stream_merger import create_stream_merger
@@ -137,6 +143,9 @@ class LLMAgent(Agent):
         response_subject (Subject): Subject that emits agent responses.
         process_all_inputs (bool): Whether to process every input emission (True) or
             skip emissions when the agent is busy processing a previous input (False).
+        api_adapter (AbstractAPIAdapter): The API adapter for provider-specific operations.
+        conversation_history (List[UnifiedMessage]): Global conversation history.
+        _history_lock (threading.Lock): Lock for thread-safe conversation history access.
     """
 
     logging_file_memory_lock = threading.Lock()
@@ -154,6 +163,7 @@ class LLMAgent(Agent):
         input_query_stream: Optional[Observable] = None,
         input_data_stream: Optional[Observable] = None,
         input_video_stream: Optional[Observable] = None,
+        api_adapter: Optional[AbstractAPIAdapter] = None,
     ):
         """
         Initializes a new instance of the LLMAgent.
@@ -166,8 +176,17 @@ class LLMAgent(Agent):
                 If None, the global scheduler from get_scheduler() will be used.
             process_all_inputs (bool): Whether to process every input emission (True) or
                 skip emissions when the agent is busy processing a previous input (False).
+            api_adapter (AbstractAPIAdapter): The API adapter for provider-specific operations.
         """
         super().__init__(dev_name, agent_type, agent_memory, pool_scheduler)
+        
+        # API adapter for provider-specific operations
+        self.api_adapter = api_adapter
+        
+        # Global conversation history with thread safety
+        self.conversation_history: List[UnifiedMessage] = []
+        self._history_lock = threading.Lock()
+        
         # These attributes can be configured by a subclass if needed.
         self.query: Optional[str] = None
         self.prompt_builder: Optional[PromptBuilder] = None
@@ -183,13 +202,11 @@ class LLMAgent(Agent):
         self.frame_processor: Optional[FrameProcessor] = None
         self.output_dir: str = os.path.join(os.getcwd(), "assets", "agent")
         self.process_all_inputs: bool = process_all_inputs
+        self.skill_library: Optional[SkillLibrary] = None
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Subject for emitting responses
         self.response_subject = Subject()
-
-        # Conversation history for maintaining context between calls
-        self.conversation_history = []
 
         # Initialize input streams
         self.input_video_stream = input_video_stream
@@ -241,6 +258,30 @@ class LLMAgent(Agent):
                 logger.info("Subscribing to input query stream...")
                 self.disposables.add(self.subscribe_to_query_processing(self.input_query_stream))
 
+    def get_capabilities(self) -> AgentCapabilities:
+        """Get the capabilities of this agent from the API adapter."""
+        if self.api_adapter:
+            return self.api_adapter.capabilities
+        # Default capabilities
+        return AgentCapabilities()
+
+    def _add_to_conversation_history(self, message: UnifiedMessage):
+        """Add a message to the conversation history in a thread-safe manner."""
+        with self._history_lock:
+            self.conversation_history.append(message)
+            logger.info(f"Added {message.role} message to conversation history (now has {len(self.conversation_history)} messages)")
+
+    def reset_conversation_history(self):
+        """Reset the conversation history."""
+        with self._history_lock:
+            self.conversation_history = []
+            logger.info("Conversation history reset")
+
+    def _get_conversation_messages(self) -> List[UnifiedMessage]:
+        """Get a copy of the conversation history in a thread-safe manner."""
+        with self._history_lock:
+            return self.conversation_history.copy()
+
     def _update_query(self, incoming_query: Optional[str]) -> None:
         """Updates the query if an incoming query is provided.
 
@@ -277,8 +318,8 @@ class LLMAgent(Agent):
         dimensions: Optional[Tuple[int, int]],
         override_token_limit: bool,
         condensed_results: str,
-    ) -> list:
-        """Builds a prompt message using the prompt builder.
+    ) -> List[UnifiedMessage]:
+        """Builds prompt messages in unified format.
 
         Args:
             base64_image (str): Optional Base64-encoded image.
@@ -287,84 +328,84 @@ class LLMAgent(Agent):
             condensed_results (str): The condensed RAG context.
 
         Returns:
-            list: A list of message dictionaries to be sent to the LLM.
+            List[UnifiedMessage]: Messages in unified format.
         """
-        # Budget for each component of the prompt
-        budgets = {
-            "system_prompt": self.max_input_tokens_per_request // _TOKEN_BUDGET_PARTS,
-            "user_query": self.max_input_tokens_per_request // _TOKEN_BUDGET_PARTS,
-            "image": self.max_input_tokens_per_request // _TOKEN_BUDGET_PARTS,
-            "rag": self.max_input_tokens_per_request // _TOKEN_BUDGET_PARTS,
-        }
-
-        # Define truncation policies for each component
-        policies = {
-            "system_prompt": "truncate_end",
-            "user_query": "truncate_middle",
-            "image": "do_not_truncate",
-            "rag": "truncate_end",
-        }
-
-        return self.prompt_builder.build(
-            user_query=self.query,
-            override_token_limit=override_token_limit,
-            base64_image=base64_image,
-            image_width=dimensions[0] if dimensions is not None else None,
-            image_height=dimensions[1] if dimensions is not None else None,
-            image_detail=self.image_detail,
-            rag_context=condensed_results,
-            system_prompt=self.system_query,
-            budgets=budgets,
-            policies=policies,
+        messages = self._get_conversation_messages()
+        
+        # Add system message if not already in history
+        if self.system_query and (not messages or messages[0].role != "system"):
+            messages.insert(0, UnifiedMessage(role="system", content=self.system_query))
+        
+        # Create user message with query and optional RAG context
+        user_content = self.query
+        if condensed_results:
+            user_content = f"{condensed_results}\n\n{self.query}"
+            
+        # Handle images if provided
+        images = None
+        if base64_image:
+            images = [base64_image] if isinstance(base64_image, str) else base64_image
+            
+        user_message = UnifiedMessage(
+            role="user",
+            content=user_content,
+            images=images
         )
+        
+        messages.append(user_message)
+        
+        # Validate messages based on capabilities
+        if self.api_adapter:
+            messages = self.api_adapter.validate_request(messages)
+            
+        return messages
 
-    def _handle_tooling(self, response_message, messages):
-        """Handles tooling callbacks in the response message.
+    def _handle_tooling(self, response: UnifiedResponse, messages: List[UnifiedMessage]) -> Optional[UnifiedResponse]:
+        """Handles tooling callbacks in the response.
 
         If tool calls are present, the corresponding functions are executed and
         a follow-up query is sent.
 
         Args:
-            response_message: The response message containing tool calls.
-            messages (list): The original list of messages sent.
+            response (UnifiedResponse): The response containing tool calls.
+            messages (List[UnifiedMessage]): The messages sent.
 
         Returns:
-            The final response message after processing tool calls, if any.
+            The final response after processing tool calls, if any.
         """
-
-        # TODO: Make this more generic or move implementation to OpenAIAgent.
-        # This is presently OpenAI-specific.
-        def _tooling_callback(message, messages, response_message, skill_library: SkillLibrary):
-            has_called_tools = False
-            new_messages = []
-            for tool_call in message.tool_calls:
-                has_called_tools = True
-                name = tool_call.function.name
-                args = json.loads(tool_call.function.arguments)
-                result = skill_library.call(name, **args)
-                logger.info(f"Function Call Results: {result}")
-                new_messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": str(result),
-                        "name": name,
-                    }
-                )
-            if has_called_tools:
-                logger.info("Sending Another Query.")
-                messages.append(response_message)
-                messages.extend(new_messages)
-                # Delegate to sending the query again.
-                return self._send_query(messages)
-            else:
-                logger.info("No Need for Another Query.")
-                return None
-
-        if response_message.tool_calls is not None:
-            return _tooling_callback(
-                response_message, messages, response_message, self.skill_library
+        if not response.tool_calls or not self.skill_library:
+            return None
+            
+        # Execute tool calls
+        new_messages = []
+        for tool_call in response.tool_calls:
+            name = tool_call["function"]["name"]
+            args = json.loads(tool_call["function"]["arguments"])
+            result = self.skill_library.call(name, **args)
+            logger.info(f"Function Call Results: {result}")
+            
+            tool_message = UnifiedMessage(
+                role="tool",
+                tool_call_id=tool_call["id"],
+                content=str(result),
+                name=name
             )
+            new_messages.append(tool_message)
+            
+        if new_messages:
+            logger.info("Sending follow-up query with tool results.")
+            # Add the assistant response and tool results to messages
+            assistant_message = UnifiedMessage(
+                role="assistant",
+                content=response.content,
+                tool_calls=response.tool_calls
+            )
+            messages.append(assistant_message)
+            messages.extend(new_messages)
+            
+            # Send another query
+            return self._send_query(messages)
+            
         return None
 
     def _observable_query(
@@ -388,66 +429,96 @@ class LLMAgent(Agent):
             Exception: Propagates any exceptions encountered during processing.
         """
         try:
+            # Check if images are supported
+            capabilities = self.get_capabilities()
+            if base64_image and not capabilities.supports_images:
+                logger.warning(f"Model {self.api_adapter.model_name} does not support images. Skipping image input.")
+                base64_image = None
+                
             self._update_query(incoming_query)
             _, condensed_results = self._get_rag_context()
             messages = self._build_prompt(
                 base64_image, dimensions, override_token_limit, condensed_results
             )
-            # logger.debug(f"Sending Query: {messages}")
+            
             logger.info("Sending Query.")
-            response_message = self._send_query(messages)
-            logger.info(f"Received Response: {response_message}")
-            if response_message is None:
-                raise Exception("Response message does not exist.")
-
-            # TODO: Make this more generic. The parsed tag and tooling handling may be OpenAI-specific.
-            # If no skill library is provided or there are no tool calls, emit the response directly.
-            if (
-                self.skill_library is None
-                or self.skill_library.get_tools() in (None, NOT_GIVEN)
-                or response_message.tool_calls is None
-            ):
-                final_msg = (
-                    response_message.parsed
-                    if hasattr(response_message, "parsed") and response_message.parsed
-                    else (
-                        response_message.content
-                        if hasattr(response_message, "content")
-                        else response_message
-                    )
-                )
-                observer.on_next(final_msg)
-                self.response_subject.on_next(final_msg)
-            else:
-                response_message_2 = self._handle_tooling(response_message, messages)
-                final_msg = (
-                    response_message_2 if response_message_2 is not None else response_message
-                )
-                if isinstance(final_msg, BaseModel):  # TODO: Test
-                    final_msg = str(final_msg.content)
-                observer.on_next(final_msg)
-                self.response_subject.on_next(final_msg)
+            response = self._send_query(messages)
+            logger.info(f"Received Response: {response}")
+            
+            if response is None:
+                raise Exception("Response does not exist.")
+                
+            # Handle tool calls if present
+            if response.tool_calls and self.skill_library and self.skill_library.get_tools():
+                final_response = self._handle_tooling(response, messages)
+                if final_response:
+                    response = final_response
+                    
+            # Emit the final response
+            final_content = response.content or str(response)
+            observer.on_next(final_content)
+            self.response_subject.on_next(final_content)
             observer.on_completed()
+            
+            # Add messages to conversation history after successful completion
+            # This ensures history is only updated when the full exchange is complete
+            with self._history_lock:
+                # Add the user message that was sent
+                if messages:
+                    user_msg = messages[-1]  # Last message should be the user message
+                    if user_msg not in self.conversation_history:
+                        self.conversation_history.append(user_msg)
+                
+                # Add the assistant response
+                assistant_msg = UnifiedMessage(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls,
+                    thinking_content=response.thinking_blocks[0] if response.thinking_blocks else None
+                )
+                self.conversation_history.append(assistant_msg)
+                
         except Exception as e:
             logger.error(f"Query failed in {self.dev_name}: {e}")
             observer.on_error(e)
             self.response_subject.on_error(e)
 
-    def _send_query(self, messages: list) -> Any:
-        """Sends the query to the LLM API.
-
-        This method must be implemented by subclasses with specifics of the LLM API.
+    def _send_query(self, messages: List[UnifiedMessage]) -> UnifiedResponse:
+        """Sends the query to the LLM API using the API adapter.
 
         Args:
-            messages (list): The prompt messages to be sent.
+            messages (List[UnifiedMessage]): The prompt messages to be sent.
 
         Returns:
-            Any: The response message from the LLM.
+            UnifiedResponse: The response from the LLM.
 
         Raises:
-            NotImplementedError: Always, unless overridden.
+            NotImplementedError: If no API adapter is configured.
         """
-        raise NotImplementedError("Subclasses must implement _send_query method.")
+        if not self.api_adapter:
+            raise NotImplementedError("No API adapter configured. Subclasses must provide an API adapter.")
+            
+        # Convert messages to provider-specific format
+        provider_messages = self.api_adapter.convert_messages(
+            messages, 
+            image_detail=self.image_detail
+        )
+        
+        # Convert tools if available
+        tools = None
+        if self.skill_library and self.skill_library.get_tools():
+            tools = self.api_adapter.convert_tools(self.skill_library.get_tools())
+            
+        # Send request via adapter
+        response = self.api_adapter.send_request(
+            provider_messages,
+            tools=tools,
+            max_tokens=self.max_output_tokens_per_request,
+            temperature=0,
+            response_model=getattr(self, 'response_model', None)
+        )
+        
+        return response
 
     def _log_response_to_file(self, response, output_dir: str = None):
         """Logs the LLM response to a file.
@@ -754,6 +825,12 @@ class OpenAIAgent(LLMAgent):
             else:
                 process_all_inputs = False
 
+        # Import OpenAI adapter
+        from dimos.agents.api_adapters import OpenAIAdapter
+        
+        # Create OpenAI adapter
+        api_adapter = OpenAIAdapter(model_name=model_name, client=openai_client)
+
         super().__init__(
             dev_name=dev_name,
             agent_type=agent_type,
@@ -764,15 +841,17 @@ class OpenAIAgent(LLMAgent):
             input_query_stream=input_query_stream,
             input_data_stream=input_data_stream,
             input_video_stream=input_video_stream,
+            api_adapter=api_adapter,
+            max_output_tokens_per_request=max_output_tokens_per_request,
+            max_input_tokens_per_request=max_input_tokens_per_request,
         )
-        self.client = openai_client or OpenAI()
+        
         self.query = query
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # Configure skill library.
+        # Configure skill library
         self.skills = skills
-        self.skill_library = None
         if isinstance(self.skills, SkillLibrary):
             self.skill_library = self.skills
         elif isinstance(self.skills, list):
@@ -783,7 +862,7 @@ class OpenAIAgent(LLMAgent):
             self.skill_library = SkillLibrary()
             self.skill_library.add(self.skills)
 
-        self.response_model = response_model if response_model is not None else NOT_GIVEN
+        self.response_model = response_model
         self.model_name = model_name
         self.tokenizer = tokenizer or OpenAITokenizer(model_name=self.model_name)
         self.prompt_builder = prompt_builder or PromptBuilder(
@@ -792,14 +871,10 @@ class OpenAIAgent(LLMAgent):
         self.rag_query_n = rag_query_n
         self.rag_similarity_threshold = rag_similarity_threshold
         self.image_detail = image_detail
-        self.max_output_tokens_per_request = max_output_tokens_per_request
-        self.max_input_tokens_per_request = max_input_tokens_per_request
-        self.max_tokens_per_request = max_input_tokens_per_request + max_output_tokens_per_request
-
-        # Add static context to memory.
-        self._add_context_to_memory()
-
         self.frame_processor = frame_processor or FrameProcessor(delete_on_init=True)
+
+        # Add static context to memory
+        self._add_context_to_memory()
 
         logger.info("OpenAI Agent Initialized.")
 
@@ -827,78 +902,7 @@ class OpenAIAgent(LLMAgent):
         for doc_id, text in context_data:
             self.agent_memory.add_vector(doc_id, text)
 
-    def _send_query(self, messages: list) -> Any:
-        """Sends the query to OpenAI's API.
 
-        Depending on whether a response model is provided, the appropriate API
-        call is made.
-
-        Args:
-            messages (list): The prompt messages to send.
-
-        Returns:
-            The response message from OpenAI.
-
-        Raises:
-            Exception: If no response message is returned.
-            ConnectionError: If there's an issue connecting to the API.
-            ValueError: If the messages or other parameters are invalid.
-        """
-        try:
-            if self.response_model is not NOT_GIVEN:
-                response = self.client.beta.chat.completions.parse(
-                    model=self.model_name,
-                    messages=messages,
-                    response_format=self.response_model,
-                    tools=(
-                        self.skill_library.get_tools()
-                        if self.skill_library is not None
-                        else NOT_GIVEN
-                    ),
-                    max_tokens=self.max_output_tokens_per_request,
-                )
-            else:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    max_tokens=self.max_output_tokens_per_request,
-                    tools=(
-                        self.skill_library.get_tools()
-                        if self.skill_library is not None
-                        else NOT_GIVEN
-                    ),
-                )
-            response_message = response.choices[0].message
-            if response_message is None:
-                logger.error("Response message does not exist.")
-                raise Exception("Response message does not exist.")
-            return response_message
-        except ConnectionError as ce:
-            logger.error(f"Connection error with API: {ce}")
-            raise
-        except ValueError as ve:
-            logger.error(f"Invalid parameters: {ve}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error in API call: {e}")
-            raise
-
-    def stream_query(self, query_text: str) -> Observable:
-        """Creates an observable that processes a text query and emits the response.
-
-        This method provides a simple way to send a text query and get an observable
-        stream of the response. It's designed for one-off queries rather than
-        continuous processing of input streams.
-
-        Args:
-            query_text (str): The query text to process.
-
-        Returns:
-            Observable: An observable that emits the response as a string.
-        """
-        return create(
-            lambda observer, _: self._observable_query(observer, incoming_query=query_text)
-        )
 
 
 # endregion OpenAIAgent Subclass (OpenAI-Specific Implementation)
