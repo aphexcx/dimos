@@ -48,6 +48,9 @@ class Transport(Protocol[T]):
     # used by local Input
     def subscribe(self, selfstream: In[T], callback: Callable[[T], any]) -> None: ...
 
+    @property
+    def connected(self) -> bool: ...
+
 
 class DaskTransport(Transport[T]):
     subscribers: List[Callable[[T], None]]
@@ -121,6 +124,9 @@ class Stream(Generic[T]):
         if not hasattr(self, "_transport"):
             self._transport = None
 
+    def set_transport(self, transport: Transport):
+        self._transport = transport
+
     @property
     def type_name(self) -> str:
         return getattr(self.type, "__name__", repr(self.type))
@@ -187,7 +193,7 @@ class RemoteStream(Stream[T]):
     def state(self) -> State:  # noqa: D401
         return State.UNBOUND if self.owner is None else State.READY
 
-    # this won't work but nvm
+    # this won't work but nvm, just need to define a setter
     @property
     def transport(self) -> Transport[T]:
         return self._transport
@@ -219,6 +225,10 @@ class In(Stream[T]):
         if self.owner is None or not hasattr(self.owner, "ref"):
             raise ValueError("Cannot serialise Out without an owner ref")
         return (RemoteIn, (self.type, self.name, self.owner.ref, self._transport))
+
+    @property
+    def connected(self) -> bool:
+        return self.connection is not None
 
     @property
     def transport(self) -> Transport[T]:

@@ -26,7 +26,7 @@ from reactivex.scheduler import ThreadPoolScheduler
 
 import dimos.core.colors as colors
 from dimos import core
-from dimos.core import In, Module, Out, rpc
+from dimos.core import In, Module, Out, RemoteOut, rpc
 from dimos.msgs.geometry_msgs import Vector3
 from dimos.msgs.sensor_msgs import Image
 from dimos.protocol import pubsub
@@ -133,7 +133,7 @@ class ControlModule(Module):
         def plancmd():
             time.sleep(4)
             print(colors.red("requesting global plan"))
-            self.plancmd.publish(Vector3([0.750893, -6.017522, 0.307474]))
+            self.plancmd.publish(Vector3([0, 0, 0]))
 
         thread = threading.Thread(target=plancmd, daemon=True)
         thread.start()
@@ -147,6 +147,9 @@ async def run(ip):
     # Ensures system multicast, udp sizes are auto-adjusted if needed
     # TODO: this doesn't seem to work atm and LCMTransport instantiation can fail
     pubsub.lcm.autoconf()
+
+    observability_stream = Out()
+    observability_stream.transport = core.LCMTransport("/observability", Vector3)
 
     connection.lidar.transport = core.LCMTransport("/lidar", LidarMessage)
     connection.odom.transport = core.LCMTransport("/odom", Odometry)
@@ -200,8 +203,8 @@ async def run(ip):
     global_planner.start()
 
     # uncomment to move the bot
-    # print(colors.green("starting ctrl"))
-    # ctrl.start()
+    print(colors.green("starting ctrl"))
+    ctrl.start()
 
     print(colors.red("READY"))
 

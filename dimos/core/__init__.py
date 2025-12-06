@@ -10,6 +10,7 @@ from rich.console import Console
 import dimos.core.colors as colors
 from dimos.core.core import In, Out, RemoteOut, rpc
 from dimos.core.module import Module, ModuleBase
+from dimos.core.observability import ObservabilityMsg
 from dimos.core.transport import LCMTransport, ZenohTransport, pLCMTransport
 from dimos.protocol.rpc.lcmrpc import LCMRPC
 from dimos.protocol.rpc.spec import RPC
@@ -19,8 +20,8 @@ def patch_actor(actor, cls): ...
 
 
 class RPCClient:
-    def __init__(self, actor_instance, actor_class):
-        self.rpc = LCMRPC()
+    def __init__(self, rpc_protocol: RPC, actor_instance, actor_class):
+        self.rpc = rpc_protocol()
         self.actor_class = actor_class
         self.remote_name = actor_class.__name__
         self.actor_instance = actor_instance
@@ -57,7 +58,11 @@ class RPCClient:
         return self.actor_instance.__getattr__(name)
 
 
-def patchdask(dask_client: Client):
+def patchdask(
+    dask_client: Client,
+    rpc_protocol=LCMRPC,
+    observability_stream=RemoteOut[ObservabilityMsg] | Out[ObservabilityMsg],
+):
     def deploy(
         actor_class,
         *args,
@@ -68,6 +73,7 @@ def patchdask(dask_client: Client):
             actor = dask_client.submit(
                 actor_class,
                 *args,
+                observability_stream=observability_stream,
                 **kwargs,
                 actor=True,
             ).result()
@@ -75,13 +81,13 @@ def patchdask(dask_client: Client):
             worker = actor.set_ref(actor).result()
             print((f"deployed: {colors.green(actor)} @ {colors.blue('worker ' + str(worker))}"))
 
-            return RPCClient(actor, actor_class)
+            return RPCClient(rpc_protocol, actor, actor_class)
 
     dask_client.deploy = deploy
     return dask_client
 
 
-def start(n: Optional[int] = None) -> Client:
+def start(n: Optional[int] = None, **kwargs) -> Client:
     console = Console()
     if not n:
         n = mp.cpu_count()
@@ -95,7 +101,7 @@ def start(n: Optional[int] = None) -> Client:
         client = Client(cluster)
 
     console.print(f"[green]Initialized dimos local cluster with [bright_blue]{n} workers")
-    return patchdask(client)
+    return patchdask(client, **kwargs)
 
 
 def stop(client: Client):

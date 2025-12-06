@@ -24,11 +24,24 @@ from dask.distributed import Actor, get_worker
 
 from dimos.core import colors
 from dimos.core.core import In, Out, RemoteIn, RemoteOut, T, Transport
+from dimos.core.observability import ObservabilityMsg
 from dimos.protocol.rpc.lcmrpc import LCMRPC
+from dimos.protocol.rpc.spec import RPC
 
 
 class ModuleBase:
-    def __init__(self, *args, **kwargs):
+    autostart: bool
+    rpc: RPC
+
+    def __init__(
+        self,
+        *args,
+        observability_stream=RemoteOut[ObservabilityMsg],
+        autostart=True,
+        **kwargs,
+    ):
+        self.autostart = autostart
+        self.observability_stream = observability_stream
         try:
             get_worker()
             self.rpc = LCMRPC()
@@ -36,6 +49,13 @@ class ModuleBase:
             self.rpc.start()
         except ValueError:
             return
+
+    # each module emits events into a observability stream
+    # these can be used to monitor the module's state and performance
+    def obs(self, msg: ObservabilityMsg):
+        if not self.observability_stream:
+            return
+        self.observability_stream.publish(msg)
 
     @property
     def outputs(self) -> dict[str, Out]:
@@ -64,6 +84,23 @@ class ModuleBase:
             and callable(getattr(cls, name, None))
             and hasattr(getattr(cls, name), "__rpc__")
         }
+
+    def start(self): ...
+
+    def maybe_autostart(self):
+        if not self.autostart:
+            return
+        if not self.inputs_connected:
+            return
+
+        self.start()
+
+    @property
+    def inputs_connected(self):
+        for inputstream in self.inputs.values():
+            if not inputstream.connected:
+                return False
+        return True
 
     def io(self) -> str:
         def _box(name: str) -> str:
@@ -149,7 +186,7 @@ class DaskModule(ModuleBase):
         if not isinstance(stream, Out) and not isinstance(stream, In):
             raise TypeError(f"Output {stream_name} is not a valid stream")
 
-        stream._transport = transport
+        stream.set_transport(transport)
         return True
 
     # called from remote
