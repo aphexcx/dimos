@@ -21,14 +21,36 @@ except ImportError:
     mavutil = None
     logging.warning("pymavlink not found. Please install pymavlink to use ArduPilot functionality.")
 
-from dimos.core import Module, Out, rpc
+from dimos.core import Module, Out, In, rpc
 from dimos.utils.logging_config import setup_logger
 
-# Import LCM message types
-from dimos_lcm.sensor_msgs import NavSatFix, NavSatStatus
+# Import standard LCM message types (always available)
+from dimos_lcm.sensor_msgs import NavSatFix, NavSatStatus, Imu, MagneticField, FluidPressure, Temperature, BatteryState
 from dimos_lcm.nav_msgs import Odometry, Path
-from dimos_lcm.geometry_msgs import PoseStamped, Pose, Point, Quaternion, Twist, Vector3, PoseWithCovariance, TwistWithCovariance
-from dimos_lcm.std_msgs import Header, Time
+from dimos_lcm.geometry_msgs import PoseStamped, Pose, Point, Quaternion, Twist, Vector3, PoseWithCovariance, TwistWithCovariance, AccelStamped, TwistStamped
+from dimos_lcm.std_msgs import Header, Time, Float64, String, UInt16, UInt8, Bool
+from dimos_lcm.diagnostic_msgs import DiagnosticArray
+
+# Try to import MAVROS-specific message types (conditional functionality)
+MAVROS_MSGS_AVAILABLE = False
+try:
+    from dimos_lcm.mavros_msgs import ActuatorControl, ExtendedState, State, ManualControl, OverrideRCIn, RCIn, RCOut, StatusEvent, StatusText, Altitude, WindEstimation
+    MAVROS_MSGS_AVAILABLE = True
+    print("MAVROS message types available - full functionality enabled")
+except ImportError:
+    print("MAVROS message types not available - using standard ROS messages only")
+    # Define dummy classes for MAVROS messages to prevent errors
+    class ActuatorControl: pass
+    class ExtendedState: pass
+    class State: pass
+    class ManualControl: pass
+    class OverrideRCIn: pass
+    class RCIn: pass
+    class RCOut: pass
+    class StatusEvent: pass
+    class StatusText: pass
+    class Altitude: pass
+    class WindEstimation: pass
 
 logger = setup_logger(__name__)
 
@@ -66,6 +88,15 @@ class ArduPilotInterface:
         self.pose_covariance = [0.0] * 36  # 6x6 covariance matrix
         self.twist_covariance = [0.0] * 36  # 6x6 covariance matrix
         self.waypoints = []
+        
+        # Additional sensor data
+        self.imu_data = {'linear_acceleration': [0.0, 0.0, 0.0], 'angular_velocity': [0.0, 0.0, 0.0]}
+        self.magnetic_field = {'x': 0.0, 'y': 0.0, 'z': 0.0}
+        self.pressure_data = {'pressure': 0.0, 'altitude': 0.0, 'temperature': 0.0}
+        self.battery_data = {'voltage': 0.0, 'current': 0.0, 'remaining': 0.0}
+        self.rc_data = {'channels': [0] * 18}
+        self.vehicle_state = {'armed': False, 'connected': False, 'guided': False, 'mode': ''}
+        self.extended_state = {'vtol_state': 0, 'landed_state': 0}
         
         # Timestamps
         self.last_global_position_time = 0
@@ -236,6 +267,50 @@ class ArduPilotInterface:
                     
                     self.last_attitude_time = time.time()
                     
+                elif msg_type == 'RAW_IMU':
+                    # Raw IMU data
+                    self.imu_data['linear_acceleration'] = [msg.xacc / 1000.0, msg.yacc / 1000.0, msg.zacc / 1000.0]  # mg to m/s²
+                    self.imu_data['angular_velocity'] = [msg.xgyro / 1000.0, msg.ygyro / 1000.0, msg.zgyro / 1000.0]  # mrad/s to rad/s
+                    self.magnetic_field['x'] = msg.xmag / 1000.0  # mGauss to Gauss
+                    self.magnetic_field['y'] = msg.ymag / 1000.0
+                    self.magnetic_field['z'] = msg.zmag / 1000.0
+                    
+                elif msg_type == 'SCALED_PRESSURE':
+                    # Pressure and temperature data
+                    self.pressure_data['pressure'] = msg.press_abs * 100.0  # hPa to Pa
+                    self.pressure_data['altitude'] = msg.press_diff  # differential pressure
+                    self.pressure_data['temperature'] = msg.temperature / 100.0  # cdegC to degC
+                    
+                elif msg_type == 'SYS_STATUS':
+                    # Battery and system status
+                    self.battery_data['voltage'] = msg.voltage_battery / 1000.0  # mV to V
+                    self.battery_data['current'] = msg.current_battery / 100.0 if msg.current_battery != -1 else 0.0  # cA to A
+                    self.battery_data['remaining'] = msg.battery_remaining / 100.0 if msg.battery_remaining != -1 else 0.0  # % to ratio
+                    
+                elif msg_type == 'RC_CHANNELS':
+                    # RC channel data
+                    self.rc_data['channels'] = [
+                        msg.chan1_raw, msg.chan2_raw, msg.chan3_raw, msg.chan4_raw,
+                        msg.chan5_raw, msg.chan6_raw, msg.chan7_raw, msg.chan8_raw,
+                        msg.chan9_raw, msg.chan10_raw, msg.chan11_raw, msg.chan12_raw,
+                        msg.chan13_raw, msg.chan14_raw, msg.chan15_raw, msg.chan16_raw,
+                        msg.chan17_raw, msg.chan18_raw
+                    ]
+                    
+                elif msg_type == 'HEARTBEAT':
+                    # Vehicle state from heartbeat
+                    self.vehicle_state['armed'] = bool(msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+                    self.vehicle_state['mode'] = mavutil.mavlink.enums['MAV_MODE'][msg.base_mode].name if msg.base_mode in mavutil.mavlink.enums['MAV_MODE'] else 'UNKNOWN'
+                    
+                elif msg_type == 'EXTENDED_SYS_STATE':
+                    # Extended state information
+                    self.extended_state['vtol_state'] = msg.vtol_state
+                    self.extended_state['landed_state'] = msg.landed_state
+                    
+                elif msg_type == 'STATUSTEXT':
+                    # Status text messages
+                    print(f"ArduPilot Status: {msg.text}")
+                    
                 elif msg_type == 'MISSION_COUNT':
                     # Request all waypoints when mission count is received
                     self.request_waypoints(msg.count)
@@ -403,10 +478,39 @@ class ArduPilotModule(Module):
         - /mavros/mission/waypoints: Mission waypoints as path
     """
 
-    # Define LCM outputs
+    # Define LCM outputs (ArduPilot → LCM)
     global_position: Out[NavSatFix] = None
     local_odom: Out[Odometry] = None
     mission_waypoints: Out[Path] = None
+    
+    # Sensor data outputs
+    imu_data: Out[Imu] = None
+    imu_data_raw: Out[Imu] = None
+    magnetic_field: Out[MagneticField] = None
+    static_pressure: Out[FluidPressure] = None
+    differential_pressure: Out[FluidPressure] = None
+    temperature_imu: Out[Temperature] = None
+    temperature_baro: Out[Temperature] = None
+    battery: Out[BatteryState] = None
+    
+    # Position outputs (standard ROS messages)
+    local_pose: Out[PoseStamped] = None
+    local_pose_cov: Out[PoseStamped] = None
+    local_velocity: Out[TwistStamped] = None
+    local_velocity_body: Out[TwistStamped] = None
+    local_velocity_body_cov: Out[TwistStamped] = None
+    local_accel: Out[AccelStamped] = None
+    
+    # Status outputs (standard ROS messages)
+    diagnostics: Out[DiagnosticArray] = None
+    
+    # Setpoint inputs
+    setpoint_position_local: In[PoseStamped] = None
+    setpoint_position_global: In[PoseStamped] = None
+    setpoint_velocity_cmd_vel: In[TwistStamped] = None
+    setpoint_accel: In[AccelStamped] = None
+    setpoint_attitude_thrust: In[Float64] = None
+    setpoint_attitude_cmd_vel: In[TwistStamped] = None
 
     def __init__(
         self,
@@ -446,6 +550,26 @@ class ArduPilotModule(Module):
         self._sequence = 0
 
         print(f"ArduPilotModule initialized for {connection_string}")
+        
+        # Add MAVROS-specific ports if available
+        if MAVROS_MSGS_AVAILABLE:
+            self._add_mavros_ports()
+
+    def _add_mavros_ports(self):
+        """Add MAVROS-specific input/output ports if MAVROS messages are available."""
+        # Vehicle state outputs (MAVROS-specific)
+        self.state: Out[State] = None
+        self.extended_state: Out[ExtendedState] = None
+        self.rc_in: Out[RCIn] = None
+        self.rc_out: Out[RCOut] = None
+        self.altitude: Out[Altitude] = None
+        self.status_text: Out[StatusText] = None
+        self.wind_estimation: Out[WindEstimation] = None
+        
+        # MAVROS input ports (LCM → ArduPilot)
+        self.actuator_control: In[ActuatorControl] = None
+        self.manual_control_send: In[ManualControl] = None
+        self.rc_override: In[OverrideRCIn] = None
 
     @rpc
     def start(self):
@@ -512,6 +636,123 @@ class ArduPilotModule(Module):
             self.ardupilot = None
 
         print("ArduPilot module stopped")
+
+    def _setup_command_subscribers(self):
+        """Set up subscribers for command inputs (MAVROS-specific)."""
+        if not MAVROS_MSGS_AVAILABLE:
+            return
+            
+        try:
+            # Subscribe to MAVROS command inputs
+            if hasattr(self, 'actuator_control') and self.actuator_control:
+                self.actuator_control.subscribe(self._handle_actuator_control)
+            if hasattr(self, 'manual_control_send') and self.manual_control_send:
+                self.manual_control_send.subscribe(self._handle_manual_control)
+            if hasattr(self, 'rc_override') and self.rc_override:
+                self.rc_override.subscribe(self._handle_rc_override)
+                
+            # Standard setpoint inputs (always available)
+            if self.setpoint_position_local:
+                self.setpoint_position_local.subscribe(self._handle_setpoint_position_local)
+            if self.setpoint_velocity_cmd_vel:
+                self.setpoint_velocity_cmd_vel.subscribe(self._handle_setpoint_velocity)
+                
+            print("Command subscribers configured")
+        except Exception as e:
+            print(f"Error setting up command subscribers: {e}")
+
+    def _handle_actuator_control(self, msg: ActuatorControl):
+        """Forward actuator control commands to ArduPilot."""
+        if not self.ardupilot or not self.ardupilot.master:
+            return
+        try:
+            self.ardupilot.master.mav.set_actuator_control_target_send(
+                0,  # time_boot_ms
+                msg.group,
+                self.ardupilot.master.target_system,
+                self.ardupilot.master.target_component,
+                msg.controls
+            )
+        except Exception as e:
+            print(f"Error sending actuator control: {e}")
+
+    def _handle_manual_control(self, msg: ManualControl):
+        """Forward manual control commands to ArduPilot."""
+        if not self.ardupilot or not self.ardupilot.master:
+            return
+        try:
+            self.ardupilot.master.mav.manual_control_send(
+                self.ardupilot.master.target_system,
+                int(msg.x * 1000),  # -1000 to 1000
+                int(msg.y * 1000),
+                int(msg.z * 1000),
+                int(msg.r * 1000),
+                msg.buttons
+            )
+        except Exception as e:
+            print(f"Error sending manual control: {e}")
+
+    def _handle_rc_override(self, msg: OverrideRCIn):
+        """Forward RC override commands to ArduPilot."""
+        if not self.ardupilot or not self.ardupilot.master:
+            return
+        try:
+            self.ardupilot.master.mav.rc_channels_override_send(
+                self.ardupilot.master.target_system,
+                self.ardupilot.master.target_component,
+                msg.channels[0] if len(msg.channels) > 0 else 0,
+                msg.channels[1] if len(msg.channels) > 1 else 0,
+                msg.channels[2] if len(msg.channels) > 2 else 0,
+                msg.channels[3] if len(msg.channels) > 3 else 0,
+                msg.channels[4] if len(msg.channels) > 4 else 0,
+                msg.channels[5] if len(msg.channels) > 5 else 0,
+                msg.channels[6] if len(msg.channels) > 6 else 0,
+                msg.channels[7] if len(msg.channels) > 7 else 0
+            )
+        except Exception as e:
+            print(f"Error sending RC override: {e}")
+
+    def _handle_setpoint_position_local(self, msg: PoseStamped):
+        """Forward local position setpoint to ArduPilot."""
+        if not self.ardupilot or not self.ardupilot.master:
+            return
+        try:
+            self.ardupilot.master.mav.set_position_target_local_ned_send(
+                0,  # time_boot_ms
+                self.ardupilot.master.target_system,
+                self.ardupilot.master.target_component,
+                mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+                0b0000111111111000,  # type_mask (ignore velocity and acceleration)
+                msg.pose.position.x,
+                msg.pose.position.y,
+                msg.pose.position.z,
+                0, 0, 0,  # velocity
+                0, 0, 0,  # acceleration
+                0, 0  # yaw, yaw_rate
+            )
+        except Exception as e:
+            print(f"Error sending position setpoint: {e}")
+
+    def _handle_setpoint_velocity(self, msg: TwistStamped):
+        """Forward velocity setpoint to ArduPilot."""
+        if not self.ardupilot or not self.ardupilot.master:
+            return
+        try:
+            self.ardupilot.master.mav.set_position_target_local_ned_send(
+                0,  # time_boot_ms
+                self.ardupilot.master.target_system,
+                self.ardupilot.master.target_component,
+                mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+                0b0000111111000111,  # type_mask (ignore position and acceleration)
+                0, 0, 0,  # position
+                msg.twist.linear.x,
+                msg.twist.linear.y,
+                msg.twist.linear.z,
+                0, 0, 0,  # acceleration
+                0, msg.twist.angular.z  # yaw, yaw_rate
+            )
+        except Exception as e:
+            print(f"Error sending velocity setpoint: {e}")
 
     def _send_heartbeat(self):
         """Send heartbeat to ArduPilot."""
@@ -615,7 +856,6 @@ class ArduPilotModule(Module):
                 pose=pose_with_cov,
                 twist=twist_with_cov
             )
-            print(data)
             self.local_odom.publish(msg)
 
         except Exception as e:
@@ -681,39 +921,3 @@ class ArduPilotModule(Module):
     def cleanup(self):
         """Clean up resources on module destruction."""
         self.stop()
-
-
-def main():
-    """Test function for standalone usage."""
-    import asyncio
-    from dimos import core
-    
-    async def test_ardupilot():
-        # Initialize DIMOS
-        dimos = core.start(1)
-        
-        # Deploy ArduPilot module
-        ardupilot = dimos.deploy(ArduPilotModule, 
-                                connection_string='/dev/ttyACM0',
-                                publish_rate=50.0)
-        
-        # Configure LCM transports OUTSIDE the module (this is the proper DIMOS way)
-        ardupilot.global_position.transport = core.LCMTransport("/mavros/global_position/global", NavSatFix)
-        ardupilot.local_odom.transport = core.LCMTransport("/mavros/local_position/odom", Odometry)
-        ardupilot.mission_waypoints.transport = core.LCMTransport("/mavros/mission/waypoints", Path)
-
-        # Start the module
-        ardupilot.start()
-        
-        # Let it run for a while
-        await asyncio.sleep(30)
-        
-        # Stop the module
-        ardupilot.stop()
-
-    if __name__ == "__main__":
-        asyncio.run(test_ardupilot())
-
-
-if __name__ == "__main__":
-    main()
