@@ -84,7 +84,7 @@ except (ConnectionError, ImportError):
     print("LCM not available")
 
 try:
-    from dimos.protocol.pubsub.shared_memory_transport import SharedMemory, SHMTopic
+    from dimos.protocol.pubsub.shared_memory_transport import SharedMemory
 
     @contextmanager
     def shared_memory_cpu_context():
@@ -103,7 +103,7 @@ try:
     testdata.append(
         (
             shared_memory_cpu_context,
-            SHMTopic(topic="/shared_mem_topic_cpu"),
+            "/shared_mem_topic_cpu",
             [b"shared_mem_value1", b"shared_mem_value2", b"shared_mem_value3"],
         )
     )
@@ -111,7 +111,7 @@ try:
     testdata.append(
         (
             shared_memory_cuda_context,
-            SHMTopic(topic="/shared_mem_topic_cuda"),
+            "/shared_mem_topic_cuda",
             [b"shared_mem_value1", b"shared_mem_value2", b"shared_mem_value3"],
         )
     )
