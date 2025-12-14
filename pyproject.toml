@@ -105,6 +105,10 @@ dependencies = [
     "dimos-lcm @ git+https://github.com/dimensionalOS/dimos-lcm.git@de4038871a4f166c3007ef6b6bc3ff83642219b2"
 ]
 
+[project.scripts]
+lcmspy = "dimos.utils.cli.lcmspy.run_lcmspy:main"
+foxglove-bridge = "dimos.utils.cli.foxglove_bridge.run_foxglove_bridge:main"
+agentspy = "dimos.utils.cli.agentspy.agentspy:main"
 
 [project.optional-dependencies]
 manipulation = [
@@ -163,6 +167,12 @@ dev = [
     "pytest==8.3.5",
     "pytest-asyncio==0.26.0",
     "textual==3.7.1"
+]
+
+sim = [
+    # Simulation
+    "mujoco>=3.3.4",
+    "playground>=0.0.5",
 ]
 
 [tool.ruff]

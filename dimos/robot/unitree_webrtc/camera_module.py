@@ -101,6 +101,7 @@ class UnitreeCameraModule(Module):
         self._latest_frame = None
         self._last_image = None
         self._last_depth = None
+        self._cannot_process_depth = False
 
         # IPC & processor members
         self.backend = self._autodetect_backend()
@@ -244,8 +245,12 @@ class UnitreeCameraModule(Module):
 
         logger.info("Main processing loop stopped")
 
-    def _process_depth(self, img_array: np.ndarray, meta=None):
-        """Process depth estimation using Metric3D (CPU/GPU handled inside the model)."""
+    def _process_depth(self, img_array: np.ndarray):
+        """Process depth estimation using Metric3D."""
+        if self._cannot_process_depth:
+            self._last_depth = None
+            return
+
         try:
             frame_start = time.time()
             logger.info(f"Frame PROCESS START {frame_start:.6f}")
@@ -270,6 +275,7 @@ class UnitreeCameraModule(Module):
 
         except Exception as e:
             logger.error(f"Error processing depth: {e}", exc_info=True)
+            self._cannot_process_depth = True
 
     def _publish_synchronized_data(self):
         """Publish color, depth, colorized depth, camera info, and pose."""
