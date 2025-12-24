@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+# Copyright 2025 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import print_function
 
 import threading
@@ -11,7 +25,7 @@ from dimos.core import LCMTransport
 from dimos.msgs.geometry_msgs import Twist, Vector3, TwistStamped
 from dimos.msgs import std_msgs
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import msvcrt
 else:
     import termios
@@ -44,34 +58,35 @@ CTRL-C to quit
 """
 
 moveBindings = {
-        'i':(1,0,0,0),
-        'o':(1,0,0,-1),
-        'j':(0,0,0,1),
-        'l':(0,0,0,-1),
-        'u':(1,0,0,1),
-        ',':(-1,0,0,0),
-        '.':(-1,0,0,1),
-        'm':(-1,0,0,-1),
-        'O':(1,-1,0,0),
-        'I':(1,0,0,0),
-        'J':(0,1,0,0),
-        'L':(0,-1,0,0),
-        'U':(1,1,0,0),
-        '<':(-1,0,0,0),
-        '>':(-1,-1,0,0),
-        'M':(-1,1,0,0),
-        't':(0,0,1,0),
-        'b':(0,0,-1,0),
-    }
+    "i": (1, 0, 0, 0),
+    "o": (1, 0, 0, -1),
+    "j": (0, 0, 0, 1),
+    "l": (0, 0, 0, -1),
+    "u": (1, 0, 0, 1),
+    ",": (-1, 0, 0, 0),
+    ".": (-1, 0, 0, 1),
+    "m": (-1, 0, 0, -1),
+    "O": (1, -1, 0, 0),
+    "I": (1, 0, 0, 0),
+    "J": (0, 1, 0, 0),
+    "L": (0, -1, 0, 0),
+    "U": (1, 1, 0, 0),
+    "<": (-1, 0, 0, 0),
+    ">": (-1, -1, 0, 0),
+    "M": (-1, 1, 0, 0),
+    "t": (0, 0, 1, 0),
+    "b": (0, 0, -1, 0),
+}
 
-speedBindings={
-        'q':(1.1,1.1),
-        'z':(.9,.9),
-        'w':(1.1,1),
-        'x':(.9,1),
-        'e':(1,1.1),
-        'c':(1,.9),
-    }
+speedBindings = {
+    "q": (1.1, 1.1),
+    "z": (0.9, 0.9),
+    "w": (1.1, 1),
+    "x": (0.9, 1),
+    "e": (1, 1.1),
+    "c": (1, 0.9),
+}
+
 
 class PublishThread(threading.Thread):
     def __init__(self, rate, topic_name, stamped=False, frame_id=""):
@@ -135,7 +150,7 @@ class PublishThread(threading.Thread):
             twist_msg.angular = Vector3()
             twist = twist_msg
             msg = twist_msg
-        
+
         while not self.done:
             self.condition.acquire()
             # Wait for a new message or timeout
@@ -146,7 +161,7 @@ class PublishThread(threading.Thread):
                 current_time = time.time()
                 twist_stamped_msg.header.stamp.sec = int(current_time)
                 twist_stamped_msg.header.stamp.nsec = int((current_time - int(current_time)) * 1e9)
-            
+
             # Copy state into twist message.
             twist.linear.x = self.x * self.speed
             twist.linear.y = self.y * self.speed
@@ -171,7 +186,7 @@ class PublishThread(threading.Thread):
 
 
 def getKey(settings, timeout):
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         # getwch() returns a string on Windows
         key = msvcrt.getwch()
     else:
@@ -181,49 +196,71 @@ def getKey(settings, timeout):
         if rlist:
             key = sys.stdin.read(1)
         else:
-            key = ''
+            key = ""
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
+
 def saveTerminalSettings():
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         return None
     return termios.tcgetattr(sys.stdin)
 
+
 def restoreTerminalSettings(old_settings):
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         return
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
-def vels(speed, turn):
-    return "currently:\tspeed %s\tturn %s " % (speed,turn)
 
-if __name__=="__main__":
+def vels(speed, turn):
+    return "currently:\tspeed %s\tturn %s " % (speed, turn)
+
+
+if __name__ == "__main__":
     settings = saveTerminalSettings()
 
     # Setup command line arguments
-    parser = argparse.ArgumentParser(description='Keyboard teleop for LCM')
-    parser.add_argument('--speed', type=float, default=0.5,
-                        help='Initial linear velocity (default: 0.5)')
-    parser.add_argument('--turn', type=float, default=1.0,
-                        help='Initial angular velocity (default: 1.0)')
-    parser.add_argument('--speed_limit', type=float, default=1000.0,
-                        help='Max linear velocity (default: 1000.0)')
-    parser.add_argument('--turn_limit', type=float, default=1000.0,
-                        help='Max angular velocity (default: 1000.0)')
-    parser.add_argument('--repeat_rate', type=float, default=0.0,
-                        help='Rate at which to repeat the last command (0 for no repeat, default: 0.0)')
-    parser.add_argument('--key_timeout', type=float, default=0.5,
-                        help='Timeout for key detection (default: 0.5)')
-    parser.add_argument('--topic', type=str, default='/cmd_vel',
-                        help='LCM topic name (default: /cmd_vel, type suffix will be added automatically)')
-    parser.add_argument('--stamped', action='store_true',
-                        help='Use TwistStamped message instead of Twist')
-    parser.add_argument('--frame_id', type=str, default='',
-                        help='Frame ID for TwistStamped messages (default: empty string)')
-    
+    parser = argparse.ArgumentParser(description="Keyboard teleop for LCM")
+    parser.add_argument(
+        "--speed", type=float, default=0.5, help="Initial linear velocity (default: 0.5)"
+    )
+    parser.add_argument(
+        "--turn", type=float, default=1.0, help="Initial angular velocity (default: 1.0)"
+    )
+    parser.add_argument(
+        "--speed_limit", type=float, default=1000.0, help="Max linear velocity (default: 1000.0)"
+    )
+    parser.add_argument(
+        "--turn_limit", type=float, default=1000.0, help="Max angular velocity (default: 1000.0)"
+    )
+    parser.add_argument(
+        "--repeat_rate",
+        type=float,
+        default=0.0,
+        help="Rate at which to repeat the last command (0 for no repeat, default: 0.0)",
+    )
+    parser.add_argument(
+        "--key_timeout", type=float, default=0.5, help="Timeout for key detection (default: 0.5)"
+    )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default="/cmd_vel",
+        help="LCM topic name (default: /cmd_vel, type suffix will be added automatically)",
+    )
+    parser.add_argument(
+        "--stamped", action="store_true", help="Use TwistStamped message instead of Twist"
+    )
+    parser.add_argument(
+        "--frame_id",
+        type=str,
+        default="",
+        help="Frame ID for TwistStamped messages (default: empty string)",
+    )
+
     args = parser.parse_args()
-    
+
     speed = args.speed
     turn = args.turn
     speed_limit = args.speed_limit
@@ -233,10 +270,10 @@ if __name__=="__main__":
     topic_name = args.topic
     stamped = args.stamped
     frame_id = args.frame_id
-    
+
     # Update topic name if using stamped message
-    if stamped and 'Twist' in topic_name and not 'TwistStamped' in topic_name:
-        topic_name = topic_name.replace('Twist', 'TwistStamped')
+    if stamped and "Twist" in topic_name and not "TwistStamped" in topic_name:
+        topic_name = topic_name.replace("Twist", "TwistStamped")
 
     pub_thread = PublishThread(repeat, topic_name, stamped, frame_id)
 
@@ -250,8 +287,8 @@ if __name__=="__main__":
         pub_thread.update(x, y, z, th, speed, turn)
 
         print(msg)
-        print(vels(speed,turn))
-        while(1):
+        print(vels(speed, turn))
+        while 1:
             key = getKey(settings, key_timeout)
             if key in moveBindings.keys():
                 x = moveBindings[key][0]
@@ -265,20 +302,20 @@ if __name__=="__main__":
                     print("Linear speed limit reached!")
                 if turn == turn_limit:
                     print("Angular speed limit reached!")
-                print(vels(speed,turn))
-                if (status == 14):
+                print(vels(speed, turn))
+                if status == 14:
                     print(msg)
                 status = (status + 1) % 15
             else:
                 # Skip updating cmd_vel if key timeout and robot already
                 # stopped.
-                if key == '' and x == 0 and y == 0 and z == 0 and th == 0:
+                if key == "" and x == 0 and y == 0 and z == 0 and th == 0:
                     continue
                 x = 0
                 y = 0
                 z = 0
                 th = 0
-                if (key == '\x03'):
+                if key == "\x03":
                     break
 
             pub_thread.update(x, y, z, th, speed, turn)

@@ -1,4 +1,19 @@
+# Copyright 2025 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Simple FlowBase driver module for DIMOS."""
+
 import numpy as np
 import portal
 import threading
@@ -66,13 +81,9 @@ class FlowBaseDriver(Module):
             # Create velocity command as numpy array
             target_velocity = np.array([vx, vy, vtheta])
 
-
             # Send to FlowBase via Portal RPC
             # Note: FlowBaseClient expects dict with 'target_velocity' and 'frame' keys
-            command = {
-                'target_velocity': target_velocity,
-                'frame': 'local'
-            }
+            command = {"target_velocity": target_velocity, "frame": "local"}
 
             # Call set_target_velocity RPC (non-blocking, FlowBase client handles the 50Hz loop)
             with self._lock:
@@ -142,10 +153,7 @@ class FlowBaseDriver(Module):
         # Send zero velocity command before stopping
         if self.connected and self.client:
             try:
-                zero_cmd = {
-                    'target_velocity': np.array([0.0, 0.0, 0.0]),
-                    'frame': 'local'
-                }
+                zero_cmd = {"target_velocity": np.array([0.0, 0.0, 0.0]), "frame": "local"}
                 with self._lock:
                     self.client.set_target_velocity(zero_cmd).result()
                 logger.info("Sent zero velocity command")
@@ -182,7 +190,9 @@ class FlowBaseDriver(Module):
                 odom = self.client.get_odometry({}).result()
 
             if self.verbose:
-                logger.debug(f"Odometry: translation={odom['translation']}, rotation={odom['rotation']:.3f}")
+                logger.debug(
+                    f"Odometry: translation={odom['translation']}, rotation={odom['rotation']:.3f}"
+                )
 
             return odom
 

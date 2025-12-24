@@ -1,4 +1,19 @@
+# Copyright 2025 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Simple test script for FlowBase driver."""
+
 import argparse
 import time
 import numpy as np
@@ -61,7 +76,9 @@ def test_odometry(driver):
     # Get odometry
     odom = driver.get_odometry()
     if odom:
-        logger.info(f"Current odometry: translation={odom['translation']}, rotation={odom['rotation']:.3f} rad")
+        logger.info(
+            f"Current odometry: translation={odom['translation']}, rotation={odom['rotation']:.3f} rad"
+        )
     else:
         logger.error("Failed to get odometry")
 
@@ -77,24 +94,45 @@ def test_odometry(driver):
     time.sleep(0.5)
     odom = driver.get_odometry()
     if odom:
-        logger.info(f"Odometry after reset: translation={odom['translation']}, rotation={odom['rotation']:.3f} rad")
+        logger.info(
+            f"Odometry after reset: translation={odom['translation']}, rotation={odom['rotation']:.3f} rad"
+        )
 
     logger.info("Odometry test completed")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Test FlowBase driver")
-    parser.add_argument("--host", type=str, default="172.6.2.20", help="FlowBase controller IP address")
+    parser.add_argument(
+        "--host", type=str, default="172.6.2.20", help="FlowBase controller IP address"
+    )
     parser.add_argument("--port", type=int, default=11323, help="FlowBase controller port")
-    parser.add_argument("--lcm-channel", type=str, default="/flowbase/cmd_vel", help="LCM channel for twist commands")
+    parser.add_argument(
+        "--lcm-channel",
+        type=str,
+        default="/flowbase/cmd_vel",
+        help="LCM channel for twist commands",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--test-commands", action="store_true", help="Run basic command tests")
     parser.add_argument("--test-odometry", action="store_true", help="Run odometry tests")
 
     # Teleop arguments
-    parser.add_argument("--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control")
-    parser.add_argument("--teleop-speed", type=float, default=0.1, help="Initial teleop linear velocity (default: 0.1 m/s)")
-    parser.add_argument("--teleop-turn", type=float, default=0.3, help="Initial teleop angular velocity (default: 0.3 rad/s)")
+    parser.add_argument(
+        "--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control"
+    )
+    parser.add_argument(
+        "--teleop-speed",
+        type=float,
+        default=0.1,
+        help="Initial teleop linear velocity (default: 0.1 m/s)",
+    )
+    parser.add_argument(
+        "--teleop-turn",
+        type=float,
+        default=0.3,
+        help="Initial teleop angular velocity (default: 0.3 rad/s)",
+    )
 
     args = parser.parse_args()
 
@@ -102,12 +140,7 @@ def main():
     dimos = start(1)
 
     logger.info(f"Deploying FlowBase driver (host={args.host}, port={args.port})")
-    driver = dimos.deploy(
-        FlowBaseDriver,
-        host=args.host,
-        port=args.port,
-        verbose=args.verbose
-    )
+    driver = dimos.deploy(FlowBaseDriver, host=args.host, port=args.port, verbose=args.verbose)
 
     # Setup LCM transport for twist commands
     logger.info(f"Setting up LCM transport on channel: {args.lcm_channel}")
@@ -133,7 +166,9 @@ def main():
         logger.info(f"  Initial turn: {args.teleop_turn} rad/s")
 
         # Find the teleop script path
-        teleop_script = os.path.join(os.path.dirname(__file__), "..", "utils", "teleop_twist_keyboard.py")
+        teleop_script = os.path.join(
+            os.path.dirname(__file__), "..", "utils", "teleop_twist_keyboard.py"
+        )
         teleop_script = os.path.abspath(teleop_script)
 
         if not os.path.exists(teleop_script):
@@ -144,9 +179,12 @@ def main():
             teleop_cmd = [
                 sys.executable,  # Use same Python interpreter
                 teleop_script,
-                "--topic", args.lcm_channel,
-                "--speed", str(args.teleop_speed),
-                "--turn", str(args.teleop_turn),
+                "--topic",
+                args.lcm_channel,
+                "--speed",
+                str(args.teleop_speed),
+                "--turn",
+                str(args.teleop_turn),
             ]
 
             try:
@@ -173,7 +211,9 @@ def main():
         if args.teleop:
             logger.info("Use the teleop keyboard controls to move the base!")
         else:
-            logger.info(f"You can publish Twist messages to LCM channel '{args.lcm_channel}' to control the base")
+            logger.info(
+                f"You can publish Twist messages to LCM channel '{args.lcm_channel}' to control the base"
+            )
             logger.info("Or use another terminal to run commands like:")
             logger.info(f"  python flow_base_simple_control.py --vx 0.3")
             logger.info("Or launch with --teleop flag for keyboard control")
