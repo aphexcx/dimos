@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 
 from reactivex import operators as ops
 from reactivex.observable import Observable
@@ -41,13 +41,20 @@ class PersonTracker(Module):
 
     camera_info: CameraInfo
 
-    def __init__(self, cameraInfo: CameraInfo, arrival_threshold: float = 0.7, **kwargs):
+    def __init__(
+        self,
+        cameraInfo: CameraInfo,
+        arrival_threshold: float = 0.7,
+        target_person_id: Optional[int] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.camera_info = cameraInfo
         self.tf = TF()
         self._sub = None
         self._is_tracking = False
         self._continuous = True
+        self._target_person_id = target_person_id  # Specific person ReID to track
         self._arrival_threshold = arrival_threshold  # bbox bottom must be in bottom 30% of frame
 
     def center_to_3d(
@@ -119,18 +126,23 @@ class PersonTracker(Module):
         return is_arrived
 
     @skill()
-    def start_tracking(self, continuous: bool = True):
+    def start_tracking(self, continuous: bool = True, target_person_id: Optional[int] = None):
         """Start person tracking.
 
         Args:
             continuous: If True, follow continuously without checking arrival.
                        If False, stop when person is reached (default: True)
+            target_person_id: Optional ReID of specific person to track.
+                            If None, tracks the largest detected person.
         """
         if not self._is_tracking:
             self._continuous = continuous
+            self._target_person_id = target_person_id
             self._sub = self.detections_stream().subscribe(self.track)
             self._is_tracking = True
-            logger.info(f"PersonTracker: Tracking started (continuous={continuous})")
+            logger.info(
+                f"PersonTracker: Tracking started (continuous={continuous}, target_id={target_person_id})"
+            )
         return "Person tracking started"
 
     @skill()
@@ -146,6 +158,24 @@ class PersonTracker(Module):
 
             logger.info("PersonTracker: Tracking stopped")
         return "Person tracking stopped"
+
+    @skill()
+    def set_target_person(self, person_id: Optional[int] = None):
+        """Set the target person to track by ReID.
+
+        Args:
+            person_id: ReID of person to track, or None to track any person.
+
+        Returns:
+            Status message
+        """
+        self._target_person_id = person_id
+        if person_id is not None:
+            logger.info(f"PersonTracker: Target set to person ID {person_id}")
+            return f"Now tracking person ID {person_id}"
+        else:
+            logger.info("PersonTracker: Target cleared, tracking any person")
+            return "Now tracking any visible person"
 
     @rpc
     def stop(self):
@@ -165,11 +195,29 @@ class PersonTracker(Module):
             logger.warning("PersonTracker: No detections, skipping")
             return
 
-        target = max(detections2D.detections, key=lambda det: det.bbox_2d_volume())
-        logger.info(
-            f"PersonTracker: Selected target person - center={target.center_bbox}, "
-            f"bbox_volume={target.bbox_2d_volume():.1f}px"
-        )
+        # Filter by target_person_id if specified
+        if self._target_person_id is not None:
+            # Filter detections by ReID (now in track_id field from enriched stream)
+            valid_detections = [
+                det for det in detections2D.detections if det.track_id == self._target_person_id
+            ]
+
+            if not valid_detections:
+                logger.info(f"Target person {self._target_person_id} not in view")
+                return
+
+            target = valid_detections[0]
+            logger.info(
+                f"PersonTracker: Tracking specific person ID {self._target_person_id} - "
+                f"center={target.center_bbox}, bbox_volume={target.bbox_2d_volume():.1f}px"
+            )
+        else:
+            # Default behavior - track largest detection
+            target = max(detections2D.detections, key=lambda det: det.bbox_2d_volume())
+            logger.info(
+                f"PersonTracker: Selected largest person - center={target.center_bbox}, "
+                f"bbox_volume={target.bbox_2d_volume():.1f}px, track_id={target.track_id}"
+            )
 
         if not self._continuous and self.check_arrival(target):
             logger.info("Person reached, stopping tracker")

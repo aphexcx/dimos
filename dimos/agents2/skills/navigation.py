@@ -276,6 +276,52 @@ class NavigationSkillContainer(SkillContainer, Resource):
             self._robot.person_tracker.stop_tracking()
 
     @skill()
+    def follow_specific_person(self, person_id: int, continuous: bool = True) -> str:
+        """Follow a specific person by their ReID.
+
+        Args:
+            person_id: The ReID of the person to track
+            continuous: If True, follow continuously without checking arrival.
+                       If False, stop when person is reached (default: True)
+
+        Returns:
+            Status message indicating success or failure
+        """
+        if not self._started:
+            raise ValueError(f"{self} has not been started.")
+
+        # Check for required modules
+        if not hasattr(self._robot, "person_tracker"):
+            return "Person tracker not available on this robot"
+
+        if not hasattr(self._robot, "reid_module"):
+            return "ReID module not available on this robot"
+
+        logger.info(f"Starting tracking of specific person ID {person_id}")
+
+        # Start tracking with the specific person ID
+        self._robot.person_tracker.start_tracking(continuous=continuous, target_person_id=person_id)
+
+        try:
+            start_time = time.time()
+            timeout = 60.0  # 60 second timeout
+
+            while time.time() - start_time < timeout:
+                # Check if tracking stopped (person reached or lost)
+                if not self._robot.person_tracker.is_tracking():
+                    logger.info(f"Tracking stopped for person ID {person_id}")
+                    return f"Finished tracking person ID {person_id}"
+
+                time.sleep(0.25)
+
+            logger.warning(f"Following person ID {person_id} timed out after {timeout}s")
+            return f"Timeout while following person ID {person_id}"
+
+        finally:
+            # Always stop tracking
+            self._robot.person_tracker.stop_tracking()
+
+    @skill()
     def stop_human_tracking(self) -> str:
         """Stop tracking and following a person.
 

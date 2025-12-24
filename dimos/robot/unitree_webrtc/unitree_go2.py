@@ -67,6 +67,7 @@ from dimos.utils.testing import TimedSensorReplay
 from dimos.perception.object_tracker_2d import ObjectTracker2D
 from dimos.perception.detection.module2D import Detection2DModule
 from dimos.perception.detection.person_tracker import PersonTracker
+from dimos.perception.detection.reid.module import ReidModule
 from dimos.navigation.bbox_navigation import BBoxNavigationModule
 from dimos_lcm.std_msgs import Bool
 from dimos.robot.robot import UnitreeRobot
@@ -420,6 +421,7 @@ class UnitreeGo2(UnitreeRobot, Resource):
         self.object_tracker = None
         self.detection_module = None
         self.person_tracker = None
+        self.reid_module = None
         self.utilization_module = None
 
         self._setup_directories()
@@ -593,6 +595,10 @@ class UnitreeGo2(UnitreeRobot, Resource):
             Detection2DModule, camera_info=ConnectionModule._camera_info(), max_freq=5
         )
 
+        # Deploy ReID module for person identification
+        # Only compute embeddings every 10 frames (0.5Hz at 5Hz detection rate) to reduce lag
+        self.reid_module = self._dimos.deploy(ReidModule, embedding_frequency=10)
+
         # Deploy PersonTracker for person following
         self.person_tracker = self._dimos.deploy(
             PersonTracker,
@@ -630,13 +636,21 @@ class UnitreeGo2(UnitreeRobot, Resource):
             "/detected/image/2", Image
         )
 
+        # Set up transports for reid module
+        self.reid_module.annotations.transport = core.LCMTransport(
+            "/reid/annotations", ImageAnnotations
+        )
+        self.reid_module.enriched_detections.transport = core.LCMTransport(
+            "/reid/detections", Detection2DArray
+        )
+
         # Set up transports for person tracker
         self.person_tracker.target.transport = core.LCMTransport("/person_path", Path)
 
         # Set up transports for bbox navigator
         # self.bbox_navigator.goal_request.transport = core.LCMTransport("/goal_request", PoseStamped)
 
-        logger.info("Object tracker, detection module, person tracker deployed")
+        logger.info("Object tracker, detection module, ReID module, person tracker deployed")
 
     def _deploy_camera(self):
         """Deploy and configure the camera module."""
@@ -650,12 +664,19 @@ class UnitreeGo2(UnitreeRobot, Resource):
             self.detection_module.image.connect(self.connection.color_image)
             logger.info("Detection module connected to camera")
 
-        # Connect person tracker inputs
+        # Connect reid module inputs
+        if self.reid_module:
+            self.reid_module.image.connect(self.connection.color_image)
+            self.reid_module.detections.connect(self.detection_module.detections)
+            logger.info("ReID module connected to detection module")
+
+        # Connect person tracker inputs - now using enriched detections from ReID
         if self.person_tracker:
             self.person_tracker.image.connect(self.connection.color_image)
-            self.person_tracker.detections.connect(self.detection_module.detections)
+            # Use enriched detections with ReIDs instead of raw detections
+            self.person_tracker.detections.connect(self.reid_module.enriched_detections)
             self.person_tracker.target.connect(self.local_planner.path)
-            logger.info("Person tracker connected to detection module and local planner")
+            logger.info("Person tracker connected to ReID module and local planner")
 
         # Connect bbox navigator inputs
         if self.bbox_navigator:
