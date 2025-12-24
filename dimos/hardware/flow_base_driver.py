@@ -17,10 +17,12 @@
 import numpy as np
 import portal
 import threading
+import time
 from typing import Optional, Dict, Any
 
 from dimos.core import Module, In, Out, rpc
-from dimos.msgs.geometry_msgs import Twist, Vector3
+from dimos.msgs.geometry_msgs import Twist, Vector3, Pose, Quaternion
+from dimos.msgs.nav_msgs import Odometry
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -30,23 +32,28 @@ class FlowBaseDriver(Module):
     """Simple FlowBase driver that interfaces with FlowBase controller via Portal RPC.
 
     Subscribes to Twist commands via LCM and forwards x, y, theta velocities to FlowBase.
+    Publishes odometry data continuously.
     Provides RPC methods to get and reset odometry.
     """
 
     twist_cmd: In[Twist] = None  # Input port for velocity commands
+    odom_out: Out[Odometry] = None  # Output port for odometry
 
-    def __init__(self, host: str = "172.6.2.20", port: int = 11323, verbose: bool = False):
+    def __init__(self, host: str = "172.6.2.20", port: int = 11323,
+                 verbose: bool = False, odom_rate: float = 20.0):
         """Initialize FlowBase driver.
 
         Args:
             host: FlowBase controller IP address
             port: FlowBase controller port (default: 11323)
             verbose: Enable verbose logging
+            odom_rate: Odometry publishing rate in Hz (default: 20.0)
         """
         super().__init__()
         self.host = host
         self.port = port
         self.verbose = verbose
+        self.odom_rate = odom_rate
 
         # Portal client (initialized in start())
         self.client = None
@@ -55,6 +62,10 @@ class FlowBaseDriver(Module):
         # Statistics
         self.command_count = 0
         self.error_count = 0
+
+        # Odometry publishing thread
+        self._odom_thread = None
+        self._odom_stop_event = threading.Event()
 
         # Thread safety
         self._lock = threading.Lock()
@@ -97,6 +108,70 @@ class FlowBaseDriver(Module):
             logger.error(f"Error sending velocity command: {e}")
             self.error_count += 1
 
+    def _odometry_publisher_loop(self):
+        """Background thread that continuously publishes odometry."""
+        logger.info(f"Odometry publisher thread started at {self.odom_rate} Hz")
+
+        publish_period = 1.0 / self.odom_rate
+
+        while not self._odom_stop_event.is_set():
+            try:
+                if not self.connected or not self.client:
+                    time.sleep(publish_period)
+                    continue
+
+                # Get odometry from FlowBase controller
+                odom_data = self.client.get_odometry({}).result()
+
+                if odom_data is None:
+                    time.sleep(publish_period)
+                    continue
+
+                # Get translation and rotation
+                translation = odom_data['translation']  # [x, y]
+                rotation = odom_data['rotation']  # theta in radians
+
+                # Convert theta to quaternion (rotation around z-axis)
+                half_theta = rotation / 2.0
+                orientation = Quaternion(
+                    0.0,  # x
+                    0.0,  # y
+                    np.sin(half_theta),  # z
+                    np.cos(half_theta)   # w
+                )
+
+                position = Vector3(
+                    float(translation[0]),  # x
+                    float(translation[1]),  # y
+                    0.0                     # z
+                )
+
+                pose = Pose(position=position, orientation=orientation)
+
+                # Create Odometry message with timestamp
+                current_time = time.time()
+                odom_msg = Odometry(
+                    ts=current_time,
+                    frame_id="odom",
+                    child_frame_id="base_link",
+                    pose=pose,
+                    twist=None  # We don't have velocity info from get_odometry
+                )
+
+                # Publish odometry
+                if self.odom_out:
+                    self.odom_out.publish(odom_msg)
+
+                    if self.verbose and (int(current_time * 10) % 10 == 0):  # Log every 1 second
+                        logger.debug(f"Published odom: x={translation[0]:.3f}, y={translation[1]:.3f}, theta={rotation:.3f}")
+
+            except Exception as e:
+                logger.error(f"Error in odometry publisher: {e}")
+
+            time.sleep(publish_period)
+
+        logger.info("Odometry publisher thread stopped")
+
     @rpc
     def connect(self) -> bool:
         """Connect to the FlowBase controller via Portal RPC.
@@ -138,6 +213,18 @@ class FlowBaseDriver(Module):
         else:
             logger.warning("No twist_cmd input port configured")
 
+        # Start odometry publishing thread
+        if self.odom_out:
+            logger.info(f"odom_out port exists: {self.odom_out}")
+            logger.info(f"odom_out transport: {self.odom_out.transport}")
+            logger.info(f"odom_out transport type: {type(self.odom_out.transport)}")
+            self._odom_stop_event.clear()
+            self._odom_thread = threading.Thread(target=self._odometry_publisher_loop, daemon=True)
+            self._odom_thread.start()
+            logger.info(f"Odometry publishing started at {self.odom_rate} Hz")
+        else:
+            logger.info("No odom_out port configured, odometry will not be published")
+
         logger.info("FlowBase driver started successfully")
         return True
 
@@ -149,6 +236,16 @@ class FlowBaseDriver(Module):
             True if stopped successfully
         """
         logger.info("Stopping FlowBase driver")
+
+        # Stop odometry publishing thread
+        if self._odom_thread is not None:
+            logger.info("Stopping odometry publisher thread...")
+            self._odom_stop_event.set()
+            self._odom_thread.join(timeout=2.0)
+            if self._odom_thread.is_alive():
+                logger.warning("Odometry thread did not stop gracefully")
+            else:
+                logger.info("Odometry publisher stopped")
 
         # Send zero velocity command before stopping
         if self.connected and self.client:

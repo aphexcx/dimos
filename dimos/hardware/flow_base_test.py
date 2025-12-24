@@ -16,57 +16,19 @@
 
 import argparse
 import time
-import numpy as np
 import subprocess
 import sys
 import os
+import numpy as np
 
 from dimos.core import start, LCMTransport
 from dimos.utils.logging_config import setup_logger
 from dimos.msgs.geometry_msgs import Twist, Vector3
+from dimos.msgs.nav_msgs import Odometry
 from dimos.hardware.flow_base_driver import FlowBaseDriver
 
 logger = setup_logger(__name__)
 
-
-def test_basic_commands(driver):
-    """Test basic movement commands."""
-    logger.info("\n=== Testing basic commands ===")
-
-    # Forward
-    logger.info("Moving forward (0.2 m/s for 2s)")
-    twist = Twist(Vector3(0.2, 0, 0), Vector3(0, 0, 0))
-    driver.twist_cmd.publish(twist)
-    time.sleep(2)
-
-    # Stop
-    logger.info("Stopping")
-    driver.twist_cmd.publish(Twist())
-    time.sleep(1)
-
-    # Left strafe
-    logger.info("Strafing left (0.2 m/s for 2s)")
-    twist = Twist(Vector3(0, 0.2, 0), Vector3(0, 0, 0))
-    driver.twist_cmd.publish(twist)
-    time.sleep(2)
-
-    # Stop
-    logger.info("Stopping")
-    driver.twist_cmd.publish(Twist())
-    time.sleep(1)
-
-    # Rotate
-    logger.info("Rotating (0.5 rad/s for 2s)")
-    twist = Twist(Vector3(0, 0, 0), Vector3(0, 0, 0.5))
-    driver.twist_cmd.publish(twist)
-    time.sleep(2)
-
-    # Stop
-    logger.info("Stopping")
-    driver.twist_cmd.publish(Twist())
-    time.sleep(1)
-
-    logger.info("Basic commands test completed")
 
 
 def test_odometry(driver):
@@ -107,32 +69,16 @@ def main():
         "--host", type=str, default="172.6.2.20", help="FlowBase controller IP address"
     )
     parser.add_argument("--port", type=int, default=11323, help="FlowBase controller port")
-    parser.add_argument(
-        "--lcm-channel",
-        type=str,
-        default="/flowbase/cmd_vel",
-        help="LCM channel for twist commands",
-    )
+    parser.add_argument("--lcm-channel", type=str, default="/flowbase/cmd_vel", help="LCM channel for twist commands")
+    parser.add_argument("--odom-channel", type=str, default="/flowbase/odom", help="LCM channel for odometry output")
+    parser.add_argument("--odom-rate", type=float, default=5.0, help="Odometry publishing rate in Hz (default: 20.0)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--test-commands", action="store_true", help="Run basic command tests")
     parser.add_argument("--test-odometry", action="store_true", help="Run odometry tests")
 
     # Teleop arguments
-    parser.add_argument(
-        "--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control"
-    )
-    parser.add_argument(
-        "--teleop-speed",
-        type=float,
-        default=0.1,
-        help="Initial teleop linear velocity (default: 0.1 m/s)",
-    )
-    parser.add_argument(
-        "--teleop-turn",
-        type=float,
-        default=0.3,
-        help="Initial teleop angular velocity (default: 0.3 rad/s)",
-    )
+    parser.add_argument("--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control")
+    parser.add_argument("--teleop-speed", type=float, default=0.1, help="Initial teleop linear velocity (default: 0.1 m/s)")
+    parser.add_argument("--teleop-turn", type=float, default=0.2, help="Initial teleop angular velocity (default: 0.3 rad/s)")
 
     args = parser.parse_args()
 
@@ -140,11 +86,44 @@ def main():
     dimos = start(1)
 
     logger.info(f"Deploying FlowBase driver (host={args.host}, port={args.port})")
-    driver = dimos.deploy(FlowBaseDriver, host=args.host, port=args.port, verbose=args.verbose)
+    driver = dimos.deploy(
+        FlowBaseDriver,
+        host=args.host,
+        port=args.port,
+        verbose=args.verbose,
+        odom_rate=args.odom_rate
+    )
 
     # Setup LCM transport for twist commands
     logger.info(f"Setting up LCM transport on channel: {args.lcm_channel}")
     driver.twist_cmd.transport = LCMTransport(args.lcm_channel, Twist)
+
+    # Setup LCM transport for odometry output
+    logger.info(f"Setting up LCM transport for odometry on channel: {args.odom_channel}")
+    driver.odom_out.transport = LCMTransport(args.odom_channel, Odometry)
+
+    # Subscribe to odometry to print it
+    odom_message_count = [0]  # Use list to allow modification in nested function
+
+    def on_odom_received(msg: Odometry):
+        """Callback to print received odometry messages."""
+        odom_message_count[0] += 1
+
+        # Only print every 10th message to avoid spam (2Hz if publishing at 20Hz)
+        if odom_message_count[0] % 10 == 0:
+            x = msg.pose.pose.position.x
+            y = msg.pose.pose.position.y
+
+            # Convert quaternion to theta (rotation around z-axis)
+            qz = msg.pose.pose.orientation.z
+            qw = msg.pose.pose.orientation.w
+            theta = 2.0 * np.arctan2(qz, qw)
+
+            print(f"[Odom #{odom_message_count[0]}] x={x:7.3f}m, y={y:7.3f}m, theta={theta:6.3f}rad ({np.degrees(theta):7.2f}°)")
+
+    odom_transport = LCMTransport(args.odom_channel, Odometry)
+    odom_transport.subscribe(on_odom_received)
+    logger.info(f"Subscribed to odometry on channel: {args.odom_channel}")
 
     # Start driver
     logger.info("Starting driver")
@@ -202,11 +181,9 @@ def main():
     if args.test_odometry:
         test_odometry(driver)
 
-    if args.test_commands:
-        test_basic_commands(driver)
 
     # If no tests requested, just keep running
-    if not args.test_commands and not args.test_odometry:
+    if not args.test_odometry:
         logger.info("\nDriver is running. Press Ctrl+C to stop.")
         if args.teleop:
             logger.info("Use the teleop keyboard controls to move the base!")
