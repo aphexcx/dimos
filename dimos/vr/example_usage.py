@@ -1,3 +1,17 @@
+# Copyright 2025 Dimensional Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Example usage of VRControllerSubscriber.
 Both direct connection and LCM transport patterns.
@@ -32,13 +46,13 @@ def example_lcm_transport():
     dimos = core.start(1)
 
     quest = dimos.deploy(MetaQuestModule, port=8881, transform_to_ros=True)
-    quest.controller_left.transport = pLCMTransport('/vr/left_controller')
-    quest.controller_right.transport = pLCMTransport('/vr/right_controller')
+    quest.controller_left.transport = pLCMTransport("/vr/left_controller")
+    quest.controller_right.transport = pLCMTransport("/vr/right_controller")
     quest.start()
 
     controller = dimos.deploy(VRControllerSubscriber)
-    controller.controller_left_in.transport = pLCMTransport('/vr/left_controller')
-    controller.controller_right_in.transport = pLCMTransport('/vr/right_controller')
+    controller.controller_left_in.transport = pLCMTransport("/vr/left_controller")
+    controller.controller_right_in.transport = pLCMTransport("/vr/right_controller")
     controller.start()
 
     print("LCM transport established")
@@ -67,8 +81,8 @@ def example_custom_subclass():
 
     dimos = core.start(1)
     robot = dimos.deploy(RobotControlModule)
-    robot.controller_left_in.transport = pLCMTransport('/vr/left_controller')
-    robot.controller_right_in.transport = pLCMTransport('/vr/right_controller')
+    robot.controller_left_in.transport = pLCMTransport("/vr/left_controller")
+    robot.controller_right_in.transport = pLCMTransport("/vr/right_controller")
     robot.start()
 
     print("Custom robot control module started")
