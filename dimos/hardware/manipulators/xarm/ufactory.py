@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dimos.hardware.end_effector import EndEffector
+from dimos.hardware.end_effectors.end_effector import EndEffector
 
 
 class UFactoryEndEffector(EndEffector):

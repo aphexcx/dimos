@@ -18,7 +18,7 @@ import argparse
 import logging
 import time
 
-from dimos.hardware.gstreamer_camera import GstreamerCameraModule
+from dimos.hardware.sensors.gstreamer_camera import GstreamerCameraModule
 from dimos import core
 from dimos.protocol import pubsub
 from dimos.msgs.sensor_msgs import Image
