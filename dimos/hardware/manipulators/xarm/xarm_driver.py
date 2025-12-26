@@ -78,6 +78,7 @@ class XArmDriverConfig(ModuleConfig):
     max_cmdnum: int = 512  # Maximum command queue size
     velocity_control: bool = False  # Use velocity control mode instead of position
     velocity_duration: float = 0.1  # Duration for velocity commands (seconds)
+    servo_j_speed: float = 0.5  # Speed for set_servo_angle_j in rad/s (0.1-1.0, lower = smoother)
 
 
 class XArmDriver(
@@ -962,7 +963,9 @@ class XArmDriver(
 
                         if command_changed:
                             code = self.arm.set_servo_angle_j(
-                                angles=joint_cmd, is_radian=self.config.is_radian
+                                angles=joint_cmd,
+                                speed=self.config.servo_j_speed,
+                                is_radian=self.config.is_radian,
                             )
                             # Store command if successfully sent
                             if code == 0:
