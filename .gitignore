@@ -8,6 +8,7 @@ __pycache__/
 *venv*/
 .venv*/
 .ssh/
+.direnv/
 
 # Ignore python tooling dirs
 *.egg-info/
@@ -48,3 +49,4 @@ yolo11n.pt
 
 # symlink one of .envrc.* if you'd like to use
 .envrc
+.claude
