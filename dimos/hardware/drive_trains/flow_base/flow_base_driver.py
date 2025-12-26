@@ -79,7 +79,7 @@ class FlowBaseDriver(Module):
         """Handle incoming Twist messages and forward to FlowBase.
             Note: FlowBase uses an inverted Y-axis compared to standard ROS convention.
             We negate the Y velocity to convert from ROS frame to FlowBase frame.
-    
+
           ROS (right-hand):   FlowBase (inverted Y):
               +Y                  -Y
               ↑                   ↑
