@@ -77,7 +77,16 @@ class FlowBaseDriver(Module):
 
     def _on_twist_received(self, msg: Twist):
         """Handle incoming Twist messages and forward to FlowBase.
-
+            Note: FlowBase uses an inverted Y-axis compared to standard ROS convention.
+            We negate the Y velocity to convert from ROS frame to FlowBase frame.
+    
+          ROS (right-hand):   FlowBase (inverted Y):
+              +Y                  -Y
+              ↑                   ↑
+           ───┼──→ +X          ───┼──→ +X
+              |                   |
+              ↓                   ↓
+             -Y                  +Y
         Args:
             msg: Twist message with linear and angular velocities
         """
@@ -91,8 +100,8 @@ class FlowBaseDriver(Module):
         try:
             # Extract velocities from Twist message
             vx = msg.linear.x
-            vy = msg.linear.y
-            vtheta = msg.angular.z
+            vy = -msg.linear.y
+            vtheta = -msg.angular.z
 
             # Create velocity command as numpy array
             target_velocity = np.array([vx, vy, vtheta])
