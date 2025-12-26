@@ -30,7 +30,6 @@ from dimos.hardware.flow_base_driver import FlowBaseDriver
 logger = setup_logger(__name__)
 
 
-
 def test_odometry(driver):
     """Test odometry functions."""
     logger.info("\n=== Testing odometry ===")
@@ -69,16 +68,40 @@ def main():
         "--host", type=str, default="172.6.2.20", help="FlowBase controller IP address"
     )
     parser.add_argument("--port", type=int, default=11323, help="FlowBase controller port")
-    parser.add_argument("--lcm-channel", type=str, default="/flowbase/cmd_vel", help="LCM channel for twist commands")
-    parser.add_argument("--odom-channel", type=str, default="/flowbase/odom", help="LCM channel for odometry output")
-    parser.add_argument("--odom-rate", type=float, default=5.0, help="Odometry publishing rate in Hz (default: 20.0)")
+    parser.add_argument(
+        "--lcm-channel",
+        type=str,
+        default="/flowbase/cmd_vel",
+        help="LCM channel for twist commands",
+    )
+    parser.add_argument(
+        "--odom-channel", type=str, default="/flowbase/odom", help="LCM channel for odometry output"
+    )
+    parser.add_argument(
+        "--odom-rate",
+        type=float,
+        default=5.0,
+        help="Odometry publishing rate in Hz (default: 20.0)",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--test-odometry", action="store_true", help="Run odometry tests")
 
     # Teleop arguments
-    parser.add_argument("--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control")
-    parser.add_argument("--teleop-speed", type=float, default=0.1, help="Initial teleop linear velocity (default: 0.1 m/s)")
-    parser.add_argument("--teleop-turn", type=float, default=0.2, help="Initial teleop angular velocity (default: 0.3 rad/s)")
+    parser.add_argument(
+        "--teleop", action="store_true", help="Launch teleop_twist_keyboard for manual control"
+    )
+    parser.add_argument(
+        "--teleop-speed",
+        type=float,
+        default=0.1,
+        help="Initial teleop linear velocity (default: 0.1 m/s)",
+    )
+    parser.add_argument(
+        "--teleop-turn",
+        type=float,
+        default=0.2,
+        help="Initial teleop angular velocity (default: 0.3 rad/s)",
+    )
 
     args = parser.parse_args()
 
@@ -91,7 +114,7 @@ def main():
         host=args.host,
         port=args.port,
         verbose=args.verbose,
-        odom_rate=args.odom_rate
+        odom_rate=args.odom_rate,
     )
 
     # Setup LCM transport for twist commands
@@ -119,7 +142,9 @@ def main():
             qw = msg.pose.pose.orientation.w
             theta = 2.0 * np.arctan2(qz, qw)
 
-            print(f"[Odom #{odom_message_count[0]}] x={x:7.3f}m, y={y:7.3f}m, theta={theta:6.3f}rad ({np.degrees(theta):7.2f}°)")
+            print(
+                f"[Odom #{odom_message_count[0]}] x={x:7.3f}m, y={y:7.3f}m, theta={theta:6.3f}rad ({np.degrees(theta):7.2f}°)"
+            )
 
     odom_transport = LCMTransport(args.odom_channel, Odometry)
     odom_transport.subscribe(on_odom_received)
@@ -180,7 +205,6 @@ def main():
     # Run tests if requested
     if args.test_odometry:
         test_odometry(driver)
-
 
     # If no tests requested, just keep running
     if not args.test_odometry:

@@ -39,8 +39,13 @@ class FlowBaseDriver(Module):
     twist_cmd: In[Twist] = None  # Input port for velocity commands
     odom_out: Out[Odometry] = None  # Output port for odometry
 
-    def __init__(self, host: str = "172.6.2.20", port: int = 11323,
-                 verbose: bool = False, odom_rate: float = 20.0):
+    def __init__(
+        self,
+        host: str = "172.6.2.20",
+        port: int = 11323,
+        verbose: bool = False,
+        odom_rate: float = 20.0,
+    ):
         """Initialize FlowBase driver.
 
         Args:
@@ -128,8 +133,8 @@ class FlowBaseDriver(Module):
                     continue
 
                 # Get translation and rotation
-                translation = odom_data['translation']  # [x, y]
-                rotation = odom_data['rotation']  # theta in radians
+                translation = odom_data["translation"]  # [x, y]
+                rotation = odom_data["rotation"]  # theta in radians
 
                 # Convert theta to quaternion (rotation around z-axis)
                 half_theta = rotation / 2.0
@@ -137,13 +142,13 @@ class FlowBaseDriver(Module):
                     0.0,  # x
                     0.0,  # y
                     np.sin(half_theta),  # z
-                    np.cos(half_theta)   # w
+                    np.cos(half_theta),  # w
                 )
 
                 position = Vector3(
                     float(translation[0]),  # x
                     float(translation[1]),  # y
-                    0.0                     # z
+                    0.0,  # z
                 )
 
                 pose = Pose(position=position, orientation=orientation)
@@ -155,7 +160,7 @@ class FlowBaseDriver(Module):
                     frame_id="odom",
                     child_frame_id="base_link",
                     pose=pose,
-                    twist=None  # We don't have velocity info from get_odometry
+                    twist=None,  # We don't have velocity info from get_odometry
                 )
 
                 # Publish odometry
@@ -163,7 +168,9 @@ class FlowBaseDriver(Module):
                     self.odom_out.publish(odom_msg)
 
                     if self.verbose and (int(current_time * 10) % 10 == 0):  # Log every 1 second
-                        logger.debug(f"Published odom: x={translation[0]:.3f}, y={translation[1]:.3f}, theta={rotation:.3f}")
+                        logger.debug(
+                            f"Published odom: x={translation[0]:.3f}, y={translation[1]:.3f}, theta={rotation:.3f}"
+                        )
 
             except Exception as e:
                 logger.error(f"Error in odometry publisher: {e}")
