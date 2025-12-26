@@ -25,7 +25,7 @@ from dimos.core import start, LCMTransport
 from dimos.utils.logging_config import setup_logger
 from dimos.msgs.geometry_msgs import Twist, Vector3
 from dimos.msgs.nav_msgs import Odometry
-from dimos.hardware.flow_base_driver import FlowBaseDriver
+from dimos.hardware.drive_trains.flow_base.flow_base_driver import FlowBaseDriver
 
 logger = setup_logger(__name__)
 
@@ -171,7 +171,7 @@ def main():
 
         # Find the teleop script path
         teleop_script = os.path.join(
-            os.path.dirname(__file__), "..", "utils", "teleop_twist_keyboard.py"
+            os.path.dirname(__file__), "..", "..", "..", "utils", "teleop_twist_keyboard.py"
         )
         teleop_script = os.path.abspath(teleop_script)
 
