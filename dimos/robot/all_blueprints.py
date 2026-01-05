@@ -41,6 +41,10 @@ all_blueprints = {
     "xarm-trajectory": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm_trajectory",
     "xarm6-trajectory-sim": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm6_trajectory_sim",
     "xarm7-trajectory-sim": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm7_trajectory_sim",
+    # xArm manipulation (driver + planner + controller)
+    "xarm6-manipulation": "dimos.manipulation.manipulation_blueprints:xarm6_manipulation",
+    "xarm7-manipulation": "dimos.manipulation.manipulation_blueprints:xarm7_manipulation",
+    "xarm6-planner-only": "dimos.manipulation.manipulation_blueprints:xarm6_planner_only",
     # Piper manipulator blueprints
     "piper-servo": "dimos.hardware.manipulators.piper.piper_blueprints:piper_servo",
     "piper-cartesian": "dimos.hardware.manipulators.piper.piper_blueprints:piper_cartesian",
@@ -90,6 +94,7 @@ all_modules = {
     "xarm_driver": "dimos.hardware.manipulators.xarm.xarm_driver",
     "cartesian_motion_controller": "dimos.manipulation.control.servo_control.cartesian_motion_controller",
     "joint_trajectory_controller": "dimos.manipulation.control.trajectory_controller.joint_trajectory_controller",
+    "manipulation_module": "dimos.manipulation.manipulation_module",
 }
 
 

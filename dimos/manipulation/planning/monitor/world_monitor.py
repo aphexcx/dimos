@@ -387,8 +387,11 @@ class WorldMonitor:
         Returns:
             Current positions or None if not yet received
         """
+        # Try state monitor first
         if robot_id in self._state_monitors:
-            return self._state_monitors[robot_id].get_current_positions()
+            positions = self._state_monitors[robot_id].get_current_positions()
+            if positions is not None:
+                return positions
 
         # Fall back to world's live context
         with self._lock:
@@ -540,8 +543,13 @@ class WorldMonitor:
             4x4 homogeneous transform
         """
         with self._world.scratch_context() as ctx:
+            # If no positions provided, fetch current from state monitor
+            if joint_positions is None:
+                joint_positions = self.get_current_positions(robot_id)
+
             if joint_positions is not None:
                 self._world.set_positions(ctx, robot_id, joint_positions)
+
             return self._world.get_ee_pose(ctx, robot_id)
 
     def get_jacobian(

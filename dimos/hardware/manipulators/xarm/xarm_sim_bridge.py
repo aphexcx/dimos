@@ -91,6 +91,7 @@ class XArmSimBridge:
         report_type: str,  # report type
         joint_state_rate: float,  # publishing rate in Hz
         control_frequency: float,  # control frequency in Hz
+        model_path: str | None = None,  # optional path to MuJoCo model
     ):
         # Select model based on number of joints (DOF)
         # Path: dimos/hardware/manipulators/xarm/ -> dimos/simulation/data/xarm{dof}/

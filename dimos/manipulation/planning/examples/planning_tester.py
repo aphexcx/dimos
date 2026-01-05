@@ -554,21 +554,31 @@ class PlanningTester:
             print(f"PLANNING FAILED: {result.status.name}")
             print(f"  Message: {result.message}")
 
-    def _execute_path(self, path: list[NDArray[np.float64]]) -> None:
-        """Execute a planned path with visualization."""
-        print("Executing path...")
+    def _execute_path(self, path: list[NDArray[np.float64]], duration: float = 5.0) -> None:
+        """Execute a planned path with visualization.
+
+        Args:
+            path: Path to execute
+            duration: Total animation duration in seconds (default 5s for clear visualization)
+        """
+        print(f"Executing path ({duration:.1f}s animation)...")
 
         # Interpolate for smooth visualization
-        interpolated = interpolate_path(path, resolution=0.03)
+        interpolated = interpolate_path(path, resolution=0.02)
+        num_frames = len(interpolated)
+
+        # Calculate frame delay based on total duration
+        dt = duration / max(num_frames - 1, 1)
 
         for i, waypoint in enumerate(interpolated):
             self._world.sync_from_joint_state(self._robot_id, waypoint)
             self._world.publish_to_meshcat()
 
-            if i % 20 == 0:
-                print(f"  Progress: {i}/{len(interpolated)}")
+            if i % max(num_frames // 5, 1) == 0:
+                progress = (i / num_frames) * 100
+                print(f"  Progress: {progress:.0f}%")
 
-            time.sleep(0.02)
+            time.sleep(dt)
 
         self._current_joints = path[-1].copy()
         print("Path execution complete!")

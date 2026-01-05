@@ -887,11 +887,21 @@ class DrakeWorld:
             return self._meshcat.web_url()
         return None
 
-    def publish_to_meshcat(self) -> None:
-        """Force publish current state to Meshcat."""
-        if self._meshcat_visualizer is not None and self._live_context is not None:
+    def publish_to_meshcat(self, ctx: Context | None = None) -> None:
+        """Force publish current state to Meshcat.
+
+        Args:
+            ctx: Context to publish. Uses live context if None.
+        """
+        if self._meshcat_visualizer is None:
+            return
+
+        if ctx is None:
+            ctx = self._live_context
+
+        if ctx is not None:
             self._meshcat_visualizer.ForcedPublish(
-                self._diagram.GetSubsystemContext(self._meshcat_visualizer, self._live_context)
+                self._diagram.GetSubsystemContext(self._meshcat_visualizer, ctx)
             )
 
     # ============= Direct Access (use with caution) =============
