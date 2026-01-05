@@ -164,12 +164,12 @@ xarm5_servo = xarm_driver(
 xarm_trajectory = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
-        dof=7,  # XArm6
+        dof=6,  # XArm6
         has_gripper=False,
         has_force_torque=False,
         control_rate=500,
         monitor_rate=10,
-        connection_type="sim",  # Use "hardware" for real robot
+        connection_type="hardware",
     ),
     joint_trajectory_controller(
         control_frequency=100.0,
@@ -199,6 +199,7 @@ xarm7_trajectory = autoconnect(
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
+        connection_type="sim",
     ),
     joint_trajectory_controller(
         control_frequency=100.0,
@@ -224,12 +225,12 @@ xarm7_trajectory = autoconnect(
 xarm_cartesian = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
-        dof=7,  # XArm6
+        dof=6,  # XArm6
         has_gripper=False,
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
-        connection_type="sim",
+        connection_type="hardware",
     ),
     cartesian_motion_controller(
         control_frequency=20.0,

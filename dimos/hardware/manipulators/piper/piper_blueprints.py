@@ -56,6 +56,7 @@ def piper_driver(**config: Any) -> Any:
             - enable_on_start: Whether to enable servos on start (default: True)
             - control_rate: Control loop + joint feedback rate in Hz (default: 100)
             - monitor_rate: Robot state monitoring rate in Hz (default: 10)
+            - connection_type: "hardware" for real Piper or "sim" for simulation (default: "hardware")
 
     Returns:
         Blueprint configuration for PiperDriver
@@ -66,6 +67,7 @@ def piper_driver(**config: Any) -> Any:
     config.setdefault("enable_on_start", True)
     config.setdefault("control_rate", 100)
     config.setdefault("monitor_rate", 10)
+    config.setdefault("connection_type", "hardware")
 
     # Return the piper_driver blueprint with the config
     return piper_driver_blueprint(**config)
@@ -115,6 +117,7 @@ piper_cartesian = autoconnect(
         enable_on_start=True,
         control_rate=100,
         monitor_rate=10,
+        connection_type="hardware",
     ),
     cartesian_motion_controller(
         control_frequency=20.0,
@@ -152,6 +155,7 @@ piper_trajectory = autoconnect(
         enable_on_start=True,
         control_rate=100,
         monitor_rate=10,
+        connection_type="sim",
     ),
     joint_trajectory_controller(
         control_frequency=100.0,
