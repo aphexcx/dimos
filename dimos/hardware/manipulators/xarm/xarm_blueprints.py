@@ -167,7 +167,7 @@ xarm_trajectory = autoconnect(
         dof=6,  # XArm6
         has_gripper=False,
         has_force_torque=False,
-        control_rate=500,
+        control_rate=100,
         monitor_rate=10,
         connection_type="hardware",
     ),

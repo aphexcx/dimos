@@ -92,15 +92,25 @@ class XArmSimBridge:
         joint_state_rate: float,  # publishing rate in Hz
         control_frequency: float,  # control frequency in Hz
     ):
-        # Path: dimos/hardware/manipulators/xarm/ -> dimos/simulation/manipulation/data/xarm7/
+        # Select model based on number of joints (DOF)
+        # Path: dimos/hardware/manipulators/xarm/ -> dimos/simulation/manipulation/data/xarm{dof}/
+        model_folder = f"xarm{num_joints}"
         self._model_path = (
             Path(__file__).parent.parent.parent.parent
             / "simulation"
             / "manipulation"
             / "data"
-            / "xarm7"
+            / model_folder
             / "scene.xml"
         )
+
+        if not self._model_path.exists():
+            raise FileNotFoundError(
+                f"MuJoCo model not found for xarm{num_joints}: {self._model_path}. "
+                f"Available models: xarm6, xarm7"
+            )
+
+        logger.info(f"SimDriverBridge: Loading {model_folder} model from {self._model_path}")
 
         self._is_radian = is_radian  # Store the unit preference (matches XArmAPI behavior)
         self._num_joints = num_joints
