@@ -21,7 +21,8 @@ import numpy as np
 
 from dimos.msgs.geometry_msgs import Pose, Quaternion, Vector3
 from dimos.perception.common.utils import project_2d_points_to_3d
-#from dimos.perception.detection2d.utils import plot_results
+
+# from dimos.perception.detection2d.utils import plot_results
 from dimos.utils.transform_utils import (
     compose_transforms,
     euler_to_quaternion,

@@ -16,12 +16,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic
 
-from typing_extensions import TypeVar
-
 from builtin_interfaces.msg import Time as ROSTime
 import cv2
 import numpy as np
 from std_msgs.msg import Header as ROSHeader
+from typing_extensions import TypeVar
 from vision_msgs.msg import (
     BoundingBox2D as ROSBoundingBox2D,
     Detection2D as ROSDetection2D,

@@ -88,6 +88,7 @@ class VisualTrackingSkillContainer(SkillModule):
     def _on_compressed_image(self, msg: ROSCompressedImage) -> None:
         import cv2
         import numpy as np
+
         compressed_data = np.frombuffer(msg.data, dtype=np.uint8)
         bgr_image = cv2.imdecode(compressed_data, cv2.IMREAD_COLOR)
         cv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)

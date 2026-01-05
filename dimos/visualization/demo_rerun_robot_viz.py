@@ -34,7 +34,6 @@ from dimos.dashboard.module import Dashboard
 from dimos.perception.object_scene_registration import object_scene_registration_module
 from dimos.visualization.ros_rerun_bridge import ros_rerun_bridge_module
 
-
 # Custom blueprint for better default layout
 custom_blueprint = rrb.Blueprint(
     rrb.Horizontal(
@@ -72,4 +71,3 @@ demo_rerun_robot_viz = autoconnect(
         mesh_marker_topic="/object_detections/mesh_markers",
     ),
 )
-

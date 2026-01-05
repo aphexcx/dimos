@@ -419,7 +419,9 @@ class ObjectSceneRegistrationModule(Module):
                                     try:
                                         self._log_mesh_to_rerun(obj)
                                     except Exception:
-                                        logger.debug("Failed to log mesh to Rerun (ignored)", exc_info=True)
+                                        logger.debug(
+                                            "Failed to log mesh to Rerun (ignored)", exc_info=True
+                                        )
                 self._mesh_request_states[object_id] = "DONE"
                 logger.info(f"Mesh complete for object_id={object_id}")
 
@@ -673,13 +675,14 @@ class ObjectSceneRegistrationModule(Module):
 
         # Convert color image - decode JPEG directly with cv2
         import cv2
+
         compressed_data = np.frombuffer(color_msg.data, dtype=np.uint8)
         bgr_image = cv2.imdecode(compressed_data, cv2.IMREAD_COLOR)
-        
+
         if bgr_image is None:
             logger.error("Failed to decode color image - got None from cv2.imdecode")
             return
-        
+
         logger.debug(f"Decoded color image: shape={bgr_image.shape}")
         cv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
         color_image = Image.from_numpy(cv_image)
@@ -930,7 +933,7 @@ class ObjectSceneRegistrationModule(Module):
             m.color.b = 0.0
             m.color.a = 0.0  # Alpha 0 = don't tint
             marker_array.markers.append(m)
-            
+
             # Rerun: log mesh with vertex colors (once per mesh, static).
             # This mirrors RViz visualization but with proper color rendering.
             with self._rerun_mesh_logged_lock:
@@ -939,32 +942,35 @@ class ObjectSceneRegistrationModule(Module):
                     try:
                         self._log_mesh_to_rerun(obj)
                     except Exception:
-                        logger.debug(f"Failed to log mesh {obj.object_id} to Rerun (ignored)", exc_info=True)
+                        logger.debug(
+                            f"Failed to log mesh {obj.object_id} to Rerun (ignored)", exc_info=True
+                        )
 
         self._mesh_markers_pub.publish(marker_array)
-    
+
     def _log_mesh_to_rerun(self, obj: Object) -> None:
         """Log a mesh with vertex colors to Rerun (ARKit Scenes pattern)."""
         import rerun as rr  # type: ignore[import-not-found]
         import trimesh  # type: ignore[import-untyped]
-        
+
         if not obj.mesh_path or not Path(obj.mesh_path).exists():
             return
-        
+
         # Load mesh (trimesh handles OBJ with vertex colors)
         mesh = trimesh.load(obj.mesh_path)
-        
+
         # Extract vertex colors (Rerun native support!)
         try:
             vertex_colors = mesh.visual.to_color().vertex_colors
         except Exception:
             vertex_colors = None
-        
+
         # Prepare pose
         if obj.fp_world_position is not None and obj.fp_world_orientation is not None:
             translation = list(obj.fp_world_position)
             # Convert quaternion to rotation matrix
             from scipy.spatial.transform import Rotation as R
+
             quat_xyzw = list(obj.fp_world_orientation)  # already in xyzw order
             rot_matrix = R.from_quat(quat_xyzw).as_matrix()
         elif obj.center is not None:
@@ -972,7 +978,7 @@ class ObjectSceneRegistrationModule(Module):
             rot_matrix = np.eye(3, dtype=np.float32)
         else:
             return
-        
+
         # Log mesh geometry + pose (ARKit Scenes pattern)
         entity_path = f"/world/perception/objects/{obj.object_id}"
         self._rr_log(
@@ -981,7 +987,7 @@ class ObjectSceneRegistrationModule(Module):
                 vertex_positions=mesh.vertices,
                 triangle_indices=mesh.faces,
                 vertex_colors=vertex_colors,  # Native Rerun support!
-                vertex_normals=mesh.vertex_normals if hasattr(mesh, 'vertex_normals') else None,
+                vertex_normals=mesh.vertex_normals if hasattr(mesh, "vertex_normals") else None,
             ),
             static=True,
         )
@@ -993,7 +999,7 @@ class ObjectSceneRegistrationModule(Module):
             ),
             static=True,
         )
-        
+
         logger.debug(f"[Rerun] Logged mesh for {obj.object_id} with vertex colors")
 
 
