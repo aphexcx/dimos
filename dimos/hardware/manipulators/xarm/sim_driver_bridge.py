@@ -15,9 +15,9 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 import threading
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import mujoco
@@ -93,7 +93,14 @@ class SimDriverBridge:
         control_frequency: float,  # control frequency in Hz
     ):
         # Path: dimos/hardware/manipulators/xarm/ -> dimos/simulation/manipulation/data/xarm7/
-        self._model_path = Path(__file__).parent.parent.parent.parent / "simulation" / "manipulation" / "data" / "xarm7" / "scene.xml"
+        self._model_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "simulation"
+            / "manipulation"
+            / "data"
+            / "xarm7"
+            / "scene.xml"
+        )
 
         self._is_radian = is_radian  # Store the unit preference (matches XArmAPI behavior)
         self._num_joints = num_joints
@@ -419,7 +426,9 @@ class SimDriverBridge:
                         self._hold_positions = list(pos_targets)
                         # DEBUG: Log control application every ~1 second
                         if self._cmdnum % int(self._control_frequency) == 0:
-                            logger.debug(f"Applying ctrl: {[f'{c:.3f}' for c in self._data.ctrl[:self._num_joints]]}")
+                            logger.debug(
+                                f"Applying ctrl: {[f'{c:.3f}' for c in self._data.ctrl[: self._num_joints]]}"
+                            )
 
                 # Step simulation
                 mujoco.mj_step(self._model, self._data)
