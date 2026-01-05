@@ -17,6 +17,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import mujoco
@@ -27,7 +28,7 @@ from dimos.utils.logging_config import setup_logger
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-logger = setup_logger(__file__)
+logger = setup_logger()
 """
 All function and variables called from xarm_driver
 Calling API
@@ -90,16 +91,18 @@ class SimDriverBridge:
         report_type: str,  # report type
         joint_state_rate: float,  # publishing rate in Hz
         control_frequency: float,  # control frequency in Hz
-        model_path: str,  # path to the Mujoco model
     ):
+        # Path: dimos/hardware/manipulators/xarm/ -> dimos/simulation/manipulation/data/xarm7/
+        self._model_path = Path(__file__).parent.parent.parent.parent / "simulation" / "manipulation" / "data" / "xarm7" / "scene.xml"
+
+        self._is_radian = is_radian  # Store the unit preference (matches XArmAPI behavior)
         self._num_joints = num_joints
         self._report_type = 100 if report_type == "dev" else 5
         self._joint_state_rate = joint_state_rate if joint_state_rate > 0 else 0.01
         self._control_frequency = control_frequency if control_frequency > 0 else 0.01
-        self._model_path = model_path
 
         # --- mujoco model & data --- #
-        self._model = mujoco.MjModel.from_xml_path(model_path)
+        self._model = mujoco.MjModel.from_xml_path(str(self._model_path))
         self._data = mujoco.MjData(self._model)
 
         # --- state variables --- #
@@ -154,7 +157,7 @@ class SimDriverBridge:
         self._core = self._CoreProxy(self)
 
     # ------------------------------------------------------------------ #
-    # Properties
+    # Properties (matching XArmAPI interface)
     # ------------------------------------------------------------------ #
     @property
     def connected(self) -> bool:
@@ -165,9 +168,39 @@ class SimDriverBridge:
         self._connected = value
 
     @property
+    def version(self) -> str:
+        """Firmware version string (matches XArmAPI.version)."""
+        return "SimDriverBridge v1.0.0"
+
+    @property
     def version_number(self) -> tuple[int, int, int]:
         """Firmware version number (major, minor, patch)."""
         return self._version_number
+
+    @property
+    def mode(self) -> int:
+        """Current control mode (matches XArmAPI.mode)."""
+        return self._mode
+
+    @property
+    def state(self) -> int:
+        """Current robot state (matches XArmAPI.state)."""
+        return self._state
+
+    @property
+    def error_code(self) -> int:
+        """Current error code (matches XArmAPI.error_code). 0 = no error."""
+        return 0
+
+    @property
+    def warn_code(self) -> int:
+        """Current warning code (matches XArmAPI.warn_code). 0 = no warning."""
+        return self._warn_code
+
+    @property
+    def cmd_num(self) -> int:
+        """Number of commands in queue (matches XArmAPI.cmd_num)."""
+        return self._cmdnum
 
     @property
     def ft_ext_force(self) -> list[float]:
@@ -309,6 +342,14 @@ class SimDriverBridge:
     def get_version(self) -> tuple[int, str]:
         return (0, "SimDriverBridge v1.0.0")
 
+    def get_servo_version(self) -> tuple[int, list[str]]:
+        """Get servo version info (matches XArmAPI.get_servo_version).
+
+        Returns:
+            Tuple of (error_code, [serial_number, ...])
+        """
+        return (0, ["SIM-XARM-001"])
+
     # ------------------------------------------------------------------ #
     # Joint state helpers
     # ------------------------------------------------------------------ #
@@ -376,6 +417,9 @@ class SimDriverBridge:
                                 # if i < self._model.nq:
                                 #     self._velocity_control_positions[i] = self._data.qpos[i]
                         self._hold_positions = list(pos_targets)
+                        # DEBUG: Log control application every ~1 second
+                        if self._cmdnum % int(self._control_frequency) == 0:
+                            logger.debug(f"Applying ctrl: {[f'{c:.3f}' for c in self._data.ctrl[:self._num_joints]]}")
 
                 # Step simulation
                 mujoco.mj_step(self._model, self._data)
@@ -436,7 +480,26 @@ class SimDriverBridge:
     # Joint / motion commands
     # ------------------------------------------------------------------ #
 
-    # simulating new firmware -> get_servo_angle is not necessary
+    def get_servo_angle(self, is_radian: bool | None = None) -> tuple[int, Sequence[float]]:
+        """Get current joint angles (matches XArmAPI.get_servo_angle).
+
+        Args:
+            is_radian: If True, return radians; if False, return degrees.
+                       If None, uses the instance default (set in constructor).
+
+        Returns:
+            Tuple of (error_code, angles). Error code 0 = success.
+        """
+        if is_radian is None:
+            is_radian = self._is_radian
+        with self._lock:
+            # Internal positions are in radians (MuJoCo uses radians)
+            positions = list(self._joint_positions)
+        if not is_radian:
+            # Convert to degrees if requested
+            positions = [math.degrees(p) for p in positions]
+        return (0, positions)
+
     def get_joint_states(self, is_radian=None) -> tuple[int, list[list[float]]]:
         with self._lock:
             positions = list(self._joint_positions)
@@ -444,17 +507,54 @@ class SimDriverBridge:
             efforts = list(self._joint_efforts)
         return (0, [positions, velocities, efforts])
 
+    def get_joint_speeds(self, is_radian: bool | None = None) -> tuple[int, Sequence[float]]:
+        """Get current joint velocities (matches XArmAPI.get_joint_speeds).
+
+        Returns:
+            Tuple of (error_code, speeds). Error code 0 = success.
+        """
+        if is_radian is None:
+            is_radian = self._is_radian
+        with self._lock:
+            # Internal velocities are in rad/s (MuJoCo uses radians)
+            velocities = list(self._joint_velocities)
+        if not is_radian:
+            # Convert to deg/s if requested
+            velocities = [math.degrees(v) for v in velocities]
+        return (0, velocities)
+
+    def get_joint_torques(self) -> tuple[int, Sequence[float]]:
+        """Get current joint torques (matches XArmAPI.get_joint_torques).
+
+        Returns:
+            Tuple of (error_code, torques). Error code 0 = success.
+        """
+        with self._lock:
+            efforts = list(self._joint_efforts)
+        return (0, efforts)
+
     def set_servo_angle_j(
         self,
         angles: Sequence[float],
-        is_radian: bool = True,
+        is_radian: bool | None = None,
         **kwargs,
     ) -> int:
-        """Set target joint angles for position control."""
+        """Set target joint angles for position control.
+
+        Args:
+            angles: Target joint angles
+            is_radian: If True, angles are in radians; if False, in degrees.
+                       If None, uses the instance default (set in constructor).
+        """
+        if is_radian is None:
+            is_radian = self._is_radian
         with self._lock:
             values = list(angles)[: self._num_joints]
             if not is_radian:
+                # Convert degrees to radians (MuJoCo uses radians internally)
                 values = [math.radians(a) for a in values]
+            # DEBUG: Log incoming commands
+            logger.info(f"set_servo_angle_j: targets={[f'{v:.3f}' for v in values]} rad")
             # Set targets (not current positions) - sim loop will control to reach these
             for i, value in enumerate(values):
                 self._joint_position_targets[i] = float(value)
@@ -466,7 +566,7 @@ class SimDriverBridge:
     def vc_set_joint_velocity(
         self,
         speeds: Sequence[float],
-        is_radian: bool = True,
+        is_radian: bool | None = None,
         duration: float | None = None,
         **kwargs,
     ) -> int:
@@ -475,7 +575,8 @@ class SimDriverBridge:
 
         Args:
             speeds: Target velocities for each joint
-            is_radian: If True, speeds are in rad/s; if False, in deg/s
+            is_radian: If True, speeds are in rad/s; if False, in deg/s.
+                       If None, uses the instance default (set in constructor).
             duration: Optional duration hint (handled by trajectory generator, not used here)
 
         Note:
@@ -483,10 +584,13 @@ class SimDriverBridge:
             sending commands after the duration. This method just sets the velocity targets.
             When all velocities are zero, the robot will hold its current position.
         """
+        if is_radian is None:
+            is_radian = self._is_radian
         self._velocity_control = True
         with self._lock:
             values = list(speeds)[: self._num_joints]
             if not is_radian:
+                # Convert deg/s to rad/s (MuJoCo uses radians internally)
                 values = [math.radians(a) for a in values]
             # Set targets (not current velocities) - sim loop will integrate these
             for i, value in enumerate(values):

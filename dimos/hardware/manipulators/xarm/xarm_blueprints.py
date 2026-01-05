@@ -57,6 +57,7 @@ def xarm_driver(**config: Any) -> Any:
             - has_force_torque: Whether F/T sensor is attached (default: False)
             - control_rate: Control loop + joint feedback rate in Hz (default: 100)
             - monitor_rate: Robot state monitoring rate in Hz (default: 10)
+            - connection_type: "hardware" for real XArm or "sim" for simulation (default: "hardware")
 
     Returns:
         Blueprint configuration for XArmDriver
@@ -68,6 +69,7 @@ def xarm_driver(**config: Any) -> Any:
     config.setdefault("has_force_torque", False)
     config.setdefault("control_rate", 100)
     config.setdefault("monitor_rate", 10)
+    config.setdefault("connection_type", "hardware")
 
     # Return the xarm_driver blueprint with the config
     return xarm_driver_blueprint(**config)
@@ -162,11 +164,12 @@ xarm5_servo = xarm_driver(
 xarm_trajectory = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
-        dof=6,  # XArm6
+        dof=7,  # XArm6
         has_gripper=False,
         has_force_torque=False,
         control_rate=500,
         monitor_rate=10,
+        connection_type="sim",  # Use "hardware" for real robot
     ),
     joint_trajectory_controller(
         control_frequency=100.0,
@@ -221,11 +224,12 @@ xarm7_trajectory = autoconnect(
 xarm_cartesian = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
-        dof=6,  # XArm6
+        dof=7,  # XArm6
         has_gripper=False,
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
+        connection_type="sim",
     ),
     cartesian_motion_controller(
         control_frequency=20.0,
