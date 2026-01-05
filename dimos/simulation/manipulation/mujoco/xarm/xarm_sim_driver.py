@@ -21,10 +21,10 @@ work identically with this simulation driver.
 Usage:
     # Same pattern as hardware XArmDriver!
     from dimos.simulation.manipulation.mujoco.xarm import XArmSimDriver
-    
+
     driver = XArmSimDriver(dof=7)
     driver.start()
-    
+
     # Use exactly like hardware
     driver.move_joint([0, 0, 0, 0, 0, 0, 0])
     state = driver.get_joint_state()
@@ -134,7 +134,6 @@ class XArmSimDriver(MuJoCoManipulatorDriver):
         super().__init__(config)
 
         logger.info(f"XArm{dof}SimDriver initialized successfully")
-
 
 
 # Blueprint configuration for declarative composition

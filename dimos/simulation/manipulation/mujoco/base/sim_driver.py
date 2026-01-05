@@ -33,17 +33,17 @@ Example:
     driver.joint_position_command.publish(JointCommand(positions=[...]))
 """
 
-import logging
-import time
 from dataclasses import dataclass
+import logging
 from threading import Event, Thread
+import time
 from typing import Any
 
 from dimos.core import rpc
-from dimos.hardware.manipulators.base.driver import BaseManipulatorDriver
 from dimos.hardware.manipulators.base.components.motion import StandardMotionComponent
 from dimos.hardware.manipulators.base.components.servo import StandardServoComponent
 from dimos.hardware.manipulators.base.components.status import StandardStatusComponent
+from dimos.hardware.manipulators.base.driver import BaseManipulatorDriver
 from dimos.hardware.manipulators.base.spec import ManipulatorCapabilities
 
 from .sdk_wrapper import MuJoCoManipulatorSDK
@@ -140,7 +140,7 @@ class MuJoCoManipulatorDriver(BaseManipulatorDriver):
         sdk = MuJoCoManipulatorSDK(dof=dof)
 
         # Create capabilities from config
-        capabilities = ManipulatorCapabilities(
+        ManipulatorCapabilities(
             dof=dof,
             has_gripper=config.get("has_gripper", False),
             has_force_torque=config.get("has_force_torque", False),
@@ -256,9 +256,7 @@ class MuJoCoManipulatorDriver(BaseManipulatorDriver):
                 # Fell behind - reset timing
                 next_time = time.perf_counter() + period
                 if sleep_time < -period * 10:
-                    self.logger.warning(
-                        f"Physics loop fell behind by {-sleep_time * 1000:.1f}ms"
-                    )
+                    self.logger.warning(f"Physics loop fell behind by {-sleep_time * 1000:.1f}ms")
 
         self.logger.debug("Physics loop stopped")
 
@@ -394,4 +392,3 @@ class MuJoCoManipulatorDriver(BaseManipulatorDriver):
             **kwargs,
         }
         return cls(config)
-

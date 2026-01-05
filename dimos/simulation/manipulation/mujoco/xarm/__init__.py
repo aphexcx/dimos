@@ -29,18 +29,17 @@ Usage:
     coordinator.loop()
 """
 
-from .xarm_sim_driver import XArmSimDriver, xarm_sim_driver
 from .xarm_sim_blueprints import (
     xarm7_sim_servo,
     xarm7_sim_trajectory,
 )
+from .xarm_sim_driver import XArmSimDriver, xarm_sim_driver
 
 __all__ = [
     # Driver
     "XArmSimDriver",
-    "xarm_sim_driver",
     # Blueprints
     "xarm7_sim_servo",
     "xarm7_sim_trajectory",
+    "xarm_sim_driver",
 ]
-

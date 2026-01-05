@@ -21,9 +21,9 @@ The wrapper implements all required methods from BaseManipulatorSDK plus
 simulation-specific extensions for physics stepping, state reset, etc.
 """
 
+from dataclasses import dataclass, field
 import logging
 import math
-from dataclasses import dataclass, field
 from typing import Any
 
 import mujoco
@@ -216,8 +216,7 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
             if self._enable_viewer:
                 self.launch_viewer()
             self.logger.info(
-                f"MuJoCo simulation connected: {self.dof} DOF, "
-                f"timestep={self.model.opt.timestep}s"
+                f"MuJoCo simulation connected: {self.dof} DOF, timestep={self.model.opt.timestep}s"
             )
             return True
 
@@ -308,16 +307,16 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
             True if command accepted
         """
         if not self.is_connected() or not self._servos_enabled:
-            self.logger.warning(f"set_joint_positions rejected: connected={self.is_connected()}, servos_enabled={self._servos_enabled}")
+            self.logger.warning(
+                f"set_joint_positions rejected: connected={self.is_connected()}, servos_enabled={self._servos_enabled}"
+            )
             return False
 
         # Clip to joint limits
         positions_arr = np.array(positions[: self.dof])
-        positions_arr = np.clip(
-            positions_arr, self._joint_limits_lower, self._joint_limits_upper
-        )
+        positions_arr = np.clip(positions_arr, self._joint_limits_lower, self._joint_limits_upper)
         self._target_positions = positions_arr
-        
+
         self.logger.info(f"set_joint_positions: target={positions_arr[:3]}...")
 
         # Scale gains by velocity factor for smoother motion
@@ -449,9 +448,7 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
         """
         return {
             "state": 0 if self._error_code == 0 else 2,  # 0=ready, 2=error
-            "mode": {"position": 0, "velocity": 1, "torque": 2}.get(
-                self._control_mode, 0
-            ),
+            "mode": {"position": 0, "velocity": 1, "torque": 2}.get(self._control_mode, 0),
             "error_code": self._error_code,
             "is_moving": self._is_moving,
             "simulation_time": self.data.time if self.data else 0.0,
@@ -568,9 +565,7 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
 
             # Convert rotation matrix to euler angles (ZYX convention)
             roll = math.atan2(rot_mat[2, 1], rot_mat[2, 2])
-            pitch = math.atan2(
-                -rot_mat[2, 0], math.sqrt(rot_mat[2, 1] ** 2 + rot_mat[2, 2] ** 2)
-            )
+            pitch = math.atan2(-rot_mat[2, 0], math.sqrt(rot_mat[2, 1] ** 2 + rot_mat[2, 2] ** 2))
             yaw = math.atan2(rot_mat[1, 0], rot_mat[0, 0])
 
             return {
@@ -699,9 +694,7 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
 
         try:
             if camera_name:
-                camera_id = mujoco.mj_name2id(
-                    self.model, mujoco.mjtObj.mjOBJ_CAMERA, camera_name
-                )
+                camera_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, camera_name)
                 self._renderer.update_scene(self.data, camera=camera_id)
             else:
                 self._renderer.update_scene(self.data)
@@ -847,14 +840,16 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
         # For position actuators: ctrl = target position directly
         # MuJoCo handles PD control internally based on actuator gainprm
         self.data.ctrl[: self.dof] = self._target_positions
-        
+
         # Debug: log occasionally (every ~100 calls)
-        if hasattr(self, '_pd_call_count'):
+        if hasattr(self, "_pd_call_count"):
             self._pd_call_count += 1
         else:
             self._pd_call_count = 0
         if self._pd_call_count % 500 == 0:
-            self.logger.debug(f"_apply_pd_control: ctrl={self.data.ctrl[:3]}..., qpos={self.data.qpos[:3]}...")
+            self.logger.debug(
+                f"_apply_pd_control: ctrl={self.data.ctrl[:3]}..., qpos={self.data.qpos[:3]}..."
+            )
 
     def _apply_velocity_control(self) -> None:
         """Apply velocity control."""
@@ -894,4 +889,3 @@ class MuJoCoManipulatorSDK(BaseManipulatorSDK):
 
         self.logger.warning("Position convergence timeout")
         return False
-

@@ -45,25 +45,25 @@ Usage:
 
 # Base classes (for creating new arm-specific drivers)
 from .mujoco.base import (
-    MuJoCoManipulatorSDK,
     MuJoCoManipulatorDriver,
+    MuJoCoManipulatorSDK,
 )
 
 # xArm simulation
 from .mujoco.xarm import (
     XArmSimDriver,
-    xarm_sim_driver,
     xarm7_sim_servo,
     xarm7_sim_trajectory,
+    xarm_sim_driver,
 )
 
 __all__ = [
+    "MuJoCoManipulatorDriver",
     # Base classes
     "MuJoCoManipulatorSDK",
-    "MuJoCoManipulatorDriver",
     # xArm simulation
     "XArmSimDriver",
-    "xarm_sim_driver",
     "xarm7_sim_servo",
     "xarm7_sim_trajectory",
+    "xarm_sim_driver",
 ]

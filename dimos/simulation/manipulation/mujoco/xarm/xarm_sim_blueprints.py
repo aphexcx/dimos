@@ -47,7 +47,6 @@ from dimos.msgs.trajectory_msgs import JointTrajectory
 
 from .xarm_sim_driver import xarm_sim_driver as xarm_sim_driver_blueprint
 
-
 # Data directory for model files
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
@@ -152,4 +151,3 @@ __all__ = [
     "xarm7_sim_servo",
     "xarm7_sim_trajectory",
 ]
-

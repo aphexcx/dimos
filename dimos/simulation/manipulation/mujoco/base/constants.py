@@ -135,4 +135,3 @@ def get_robot_config(robot_name: str) -> dict:
         available = ", ".join(ROBOT_CONFIGS.keys())
         raise ValueError(f"Unknown robot '{robot_name}'. Available: {available}")
     return ROBOT_CONFIGS[robot_name].copy()
-
