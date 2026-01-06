@@ -25,6 +25,3 @@ THREAD_JOIN_TIMEOUT = 2.0
 
 # Velocity control threshold (rad/s) - below this, treat as stopped
 VELOCITY_STOP_THRESHOLD = 1e-6
-
-# Position target zero threshold (rad) - below this, treat as zero
-POSITION_ZERO_THRESHOLD = 1e-6
