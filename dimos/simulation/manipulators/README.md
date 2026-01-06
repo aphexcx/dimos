@@ -167,9 +167,7 @@ To add support for a new robot manipulator:
 2. Create simulation bridge class
 3. Update Driver Wrapper
 
-Modify your robot's driver wrapper to use the simulation bridge when `connection_type="sim"`:
-
-`
+Modify your robot's driver wrapper to use the simulation bridge when `connection_type="sim"`
 
 ## Implementation Details
 
