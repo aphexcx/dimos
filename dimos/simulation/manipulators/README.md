@@ -73,7 +73,7 @@ Utilities for loading MuJoCo models:
   - Looks in `dimos/simulation/manipulators/data/`
   - Supports DOF-based paths (e.g., `xarm6/`, `xarm7/`)
   - Falls back to simple robot name (e.g., `piper/`)
-  
+
 - `load_manipulator_model(robot_name, num_joints, model_path)`: Loads MuJoCo model and data
 
 ### `constants.py`
