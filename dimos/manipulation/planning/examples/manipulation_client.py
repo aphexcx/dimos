@@ -326,6 +326,40 @@ class ManipulationClient:
         """
         return self._call_driver("set_gripper_speed", speed)
 
+    def get_orientation(
+        self, orientation_values: list[float] | None = None
+    ) -> tuple[float, float, float]:
+        """Get orientation (roll, pitch, yaw) from provided values or current EE pose.
+        
+        Args:
+            orientation_values: Optional list of orientation values [roll, pitch, yaw] or partial [roll] or [roll, pitch]
+        
+        Returns:
+            Tuple of (roll, pitch, yaw) in radians
+        
+        Raises:
+            RuntimeError: If orientation_values is not provided and current EE pose cannot be retrieved
+        """
+        if orientation_values is not None and len(orientation_values) > 0:
+            roll = orientation_values[0]
+            pitch = orientation_values[1] if len(orientation_values) > 1 else 0.0
+            yaw = orientation_values[2] if len(orientation_values) > 2 else 0.0
+            return roll, pitch, yaw
+        
+        # Get current EE pose and use its orientation
+        ee_pose = self.get_ee_pose()
+        if ee_pose is not None and len(ee_pose) >= 6:
+            roll, pitch, yaw = ee_pose[3], ee_pose[4], ee_pose[5]
+            print(
+                f"Using current orientation: roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
+            )
+            return roll, pitch, yaw
+        else:
+            # Raise error if EE pose not available
+            raise RuntimeError(
+                "Could not get current end-effector pose. Please provide orientation explicitly (roll, pitch, yaw)."
+            )
+
 
 def interactive_mode(client: ManipulationClient) -> None:
     """Run interactive CLI mode."""
@@ -504,9 +538,8 @@ def interactive_mode(client: ManipulationClient) -> None:
                     print("Usage: pose x y z [roll pitch yaw]")
                     continue
                 x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
-                roll = float(parts[4]) if len(parts) > 4 else np.pi
-                pitch = float(parts[5]) if len(parts) > 5 else 0.0
-                yaw = float(parts[6]) if len(parts) > 6 else 0.0
+                orientation_values = [float(v) for v in parts[4:7]] if len(parts) > 4 else None
+                roll, pitch, yaw = client.get_orientation(orientation_values)
                 success = client.move_to_pose(x, y, z, roll, pitch, yaw)
                 print(f"Success: {success}")
 
@@ -530,25 +563,8 @@ def interactive_mode(client: ManipulationClient) -> None:
                         print("Usage: plan pose x y z [roll pitch yaw]")
                         continue
                     x, y, z = float(parts[2]), float(parts[3]), float(parts[4])
-                    # If orientation not provided, use current end-effector orientation
-                    if len(parts) > 5:
-                        roll = float(parts[5])
-                        pitch = float(parts[6]) if len(parts) > 6 else 0.0
-                        yaw = float(parts[7]) if len(parts) > 7 else 0.0
-                    else:
-                        # Get current EE pose and use its orientation
-                        ee_pose = client.get_ee_pose()
-                        if ee_pose is not None and len(ee_pose) >= 6:
-                            roll, pitch, yaw = ee_pose[3], ee_pose[4], ee_pose[5]
-                            print(
-                                f"Using current orientation: roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
-                            )
-                        else:
-                            # Fallback to default if EE pose not available
-                            roll, pitch, yaw = np.pi, 0.0, 0.0
-                            print(
-                                "Warning: Could not get current EE pose, using default orientation"
-                            )
+                    orientation_values = [float(v) for v in parts[5:8]] if len(parts) > 5 else None
+                    roll, pitch, yaw = client.get_orientation(orientation_values)
                     success = client.plan_to_pose(x, y, z, roll, pitch, yaw)
                     print(f"Planning success: {success}")
                     if success:
@@ -796,9 +812,8 @@ def main() -> None:
         if args.move_pose:
             p = args.move_pose
             x, y, z = p[0], p[1], p[2]
-            roll = p[3] if len(p) > 3 else np.pi
-            pitch = p[4] if len(p) > 4 else 0.0
-            yaw = p[5] if len(p) > 5 else 0.0
+            orientation_values = p[3:6] if len(p) > 3 else None
+            roll, pitch, yaw = client.get_orientation(orientation_values)
             success = client.move_to_pose(x, y, z, roll, pitch, yaw)
             print(f"Success: {success}")
 
@@ -810,9 +825,8 @@ def main() -> None:
         if args.plan_pose:
             p = args.plan_pose
             x, y, z = p[0], p[1], p[2]
-            roll = p[3] if len(p) > 3 else np.pi
-            pitch = p[4] if len(p) > 4 else 0.0
-            yaw = p[5] if len(p) > 5 else 0.0
+            orientation_values = p[3:6] if len(p) > 3 else None
+            roll, pitch, yaw = client.get_orientation(orientation_values)
             success = client.plan_to_pose(x, y, z, roll, pitch, yaw)
             print(f"Planning success: {success}")
 
