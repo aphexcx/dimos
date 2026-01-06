@@ -57,9 +57,10 @@ logger = setup_logger()
 class PointCloudBuffer:
     """Buffer that accumulates pointclouds with timestamps for 5-second decay effect."""
 
-    def __init__(self, decay_seconds: float = 5.0):
+    def __init__(self, decay_seconds: float = 5.0, name: str = "unnamed"):
         self.decay_seconds = decay_seconds
         self.scans = deque()  # List of (timestamp, points_array)
+        self.name = name
 
     def add_scan(self, points: np.ndarray) -> None:
         """Add a new scan with current timestamp."""
@@ -83,6 +84,20 @@ class PointCloudBuffer:
         all_points = [p for t, p in self.scans]
         return np.vstack(all_points) if all_points else np.zeros((0, 3), dtype=np.float32)
 
+    def get_memory_stats(self) -> dict:
+        """Get memory usage statistics for this buffer."""
+        self._cleanup()
+        num_scans = len(self.scans)
+        total_points = sum(p.shape[0] for _, p in self.scans)
+        # Each point is 3 floats × 4 bytes = 12 bytes
+        memory_mb = (total_points * 12) / (1024 * 1024)
+        return {
+            "name": self.name,
+            "num_scans": num_scans,
+            "total_points": total_points,
+            "memory_mb": memory_mb,
+        }
+
 
 class RosRerunBridgeNode(Node):
     """ROS2 node that bridges autonomy stack topics to Rerun."""
@@ -97,9 +112,13 @@ class RosRerunBridgeNode(Node):
         self.callback_group = ReentrantCallbackGroup()
 
         # Point cloud buffers for 5-second decay
-        self._registered_scan_buffer = PointCloudBuffer(decay_seconds=5.0)
-        self._terrain_map_buffer = PointCloudBuffer(decay_seconds=5.0)
-        self._overall_map_buffer = PointCloudBuffer(decay_seconds=10.0)  # Keep map longer
+        self._registered_scan_buffer = PointCloudBuffer(decay_seconds=5.0, name="registered_scan")
+        self._terrain_map_buffer = PointCloudBuffer(decay_seconds=5.0, name="terrain_map")
+        self._overall_map_buffer = PointCloudBuffer(decay_seconds=10.0, name="overall_map")
+
+        # Memory logging
+        self._last_mem_log_time = 0.0
+        self._mem_log_interval = 10.0  # Log every 10 seconds
 
         # Frame counter for sequence timeline
         self._frame_count = 0
@@ -129,6 +148,31 @@ class RosRerunBridgeNode(Node):
         self._setup_subscriptions()
 
         logger.info("[RosRerunBridge] ROS2 node initialized")
+
+    def _log_memory_stats(self) -> None:
+        """Log memory usage of point cloud buffers periodically."""
+        now = time.time()
+        if now - self._last_mem_log_time < self._mem_log_interval:
+            return
+        self._last_mem_log_time = now
+
+        buffers = [
+            self._registered_scan_buffer,
+            self._terrain_map_buffer,
+            self._overall_map_buffer,
+        ]
+
+        total_mb = 0.0
+        stats_parts = []
+        for buf in buffers:
+            stats = buf.get_memory_stats()
+            total_mb += stats["memory_mb"]
+            stats_parts.append(f"{stats['name']}={stats['total_points']}pts/{stats['memory_mb']:.1f}MB")
+
+        logger.warning(
+            f"[RosRerunBridge:MemStats] Buffers: {' | '.join(stats_parts)} | "
+            f"Total={total_mb:.1f}MB | Frames={self._frame_count}"
+        )
 
     def _log_with_time(self, entity_path: str, archetype: Any, stamp: Any) -> None:
         """Thread-safe helper to set timeline and log atomically."""
@@ -166,13 +210,6 @@ class RosRerunBridgeNode(Node):
         )
         self.create_subscription(
             PointCloud2, "/free_paths", self._on_free_paths, 5, callback_group=self.callback_group
-        )
-        self.create_subscription(
-            PointCloud2,
-            "/explored_areas",
-            self._on_explored_areas,
-            5,
-            callback_group=self.callback_group,
         )
         self.create_subscription(
             PointCloud2, "/trajectory", self._on_trajectory, 5, callback_group=self.callback_group
@@ -275,6 +312,9 @@ class RosRerunBridgeNode(Node):
             except Exception as e:
                 logger.error(f"[RosRerunBridge] Failed to log registered_scan: {e}", exc_info=True)
 
+        # Periodic memory stats logging
+        self._log_memory_stats()
+
     def _on_terrain_map(self, msg: PointCloud2) -> None:
         pts = self._parse_pointcloud(msg, max_points=200_000)
         if pts is not None:
@@ -334,20 +374,6 @@ class RosRerunBridgeNode(Node):
                     )
             except Exception as e:
                 logger.error(f"[RosRerunBridge] Failed to log free_paths: {e}", exc_info=True)
-
-    def _on_explored_areas(self, msg: PointCloud2) -> None:
-        pts = self._parse_pointcloud(msg, max_points=200_000)
-        if pts is not None:
-            try:
-                with self._log_lock:
-                    self.rc.stream.set_time("frame", sequence=self._frame_count)
-                    self.rc.log(
-                        "world/lidar/explored_areas",
-                        rr.Points3D(pts, colors=[[255, 255, 255]], radii=0.005),
-                        static=True,  # Explored areas persist
-                    )
-            except Exception as e:
-                logger.error(f"[RosRerunBridge] Failed to log explored_areas: {e}", exc_info=True)
 
     def _on_trajectory(self, msg: PointCloud2) -> None:
         pts = self._parse_pointcloud(msg, max_points=100_000)
@@ -637,6 +663,19 @@ class RosRerunBridgeModule(Module):
 
         self._spin_thread = threading.Thread(target=spin_executor, daemon=True)
         self._spin_thread.start()
+
+        # Load saved Rerun blueprint if it exists
+        blueprint_path = "/home/dimensional/dimos/dimos/visualization/dimos_main_rerun.rbl"
+        try:
+            from pathlib import Path
+
+            if Path(blueprint_path).exists():
+                rr.log_file_from_path(blueprint_path)
+                logger.info(f"[RosRerunBridge] Loaded blueprint from {blueprint_path}")
+            else:
+                logger.warning(f"[RosRerunBridge] Blueprint file not found: {blueprint_path}")
+        except Exception as e:
+            logger.warning(f"[RosRerunBridge] Failed to load blueprint: {e}")
 
         logger.info("[RosRerunBridge] Module started successfully")
 

@@ -147,6 +147,11 @@ class ObjectSceneRegistrationModule(Module):
         self._rerun_mesh_logged: set[str] = set()
         self._rerun_mesh_logged_lock = threading.Lock()
 
+        # Memory logging
+        self._last_mem_log_time = 0.0
+        self._mem_log_interval = 10.0  # Log every 10 seconds
+        self._process_count = 0
+
     def _rr(self) -> RerunConnection:
         """Get a thread-local RerunConnection (one per callback/worker thread)."""
         rc = getattr(self._rr_local, "rc", None)
@@ -154,6 +159,49 @@ class ObjectSceneRegistrationModule(Module):
             rc = RerunConnection()
             self._rr_local.rc = rc
         return rc
+
+    def _log_memory_stats(self, context: str = "") -> None:
+        """Log memory diagnostic information periodically."""
+        import time as _time
+
+        now = _time.time()
+        if now - self._last_mem_log_time < self._mem_log_interval:
+            return
+        self._last_mem_log_time = now
+
+        # ObjectDB stats
+        db_stats = self._object_db.get_stats() if self._object_db else {}
+
+        # Queue sizes
+        mesh_queue_size = self._mesh_request_queue.qsize() if self._mesh_request_queue else 0
+        proc_queue_size = self._processing_queue.qsize() if self._processing_queue else 0
+
+        # Count mesh states
+        mesh_states: dict[str, int] = {}
+        for state in self._mesh_request_states.values():
+            mesh_states[state] = mesh_states.get(state, 0) + 1
+
+        # Estimate memory in Object instances
+        total_pc_points = 0
+        if self._object_db:
+            for obj in self._object_db.get_objects():
+                if obj.pointcloud is not None:
+                    try:
+                        total_pc_points += len(obj.pointcloud.pointcloud.points)
+                    except Exception:
+                        pass
+
+        # Pointcloud memory: each point is 3 doubles (24 bytes) + colors (24 bytes) = ~48 bytes
+        pc_mem_mb = (total_pc_points * 48) / (1024 * 1024)
+
+        logger.warning(
+            f"[ObjectSceneReg:MemStats] {context} | "
+            f"ObjectDB: perm={db_stats.get('permanent_count', 0)} pend={db_stats.get('pending_count', 0)} | "
+            f"Queues: mesh={mesh_queue_size} proc={proc_queue_size} | "
+            f"MeshStates: {mesh_states} | "
+            f"PCPoints: {total_pc_points} (~{pc_mem_mb:.1f}MB) | "
+            f"ProcessCount: {self._process_count}"
+        )
 
     def _rr_log(self, entity_path: str, value, **kwargs) -> None:  # type: ignore[no-untyped-def]
         try:
@@ -776,6 +824,10 @@ class ObjectSceneRegistrationModule(Module):
 
         # Process 3D detections
         self._process_3d_detections(detections_2d, color_image, depth_image, color_msg.header)
+
+        # Track processing count and log memory stats periodically
+        self._process_count += 1
+        self._log_memory_stats("after_process")
 
     def _process_3d_detections(
         self,
