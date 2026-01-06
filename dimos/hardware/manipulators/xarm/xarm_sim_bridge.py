@@ -15,10 +15,7 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
-import threading
-import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from dimos.simulation.manipulators.mujoco_sim import MujocoSimBridgeBase
 from dimos.simulation.manipulators.mujoco_sim.constants import VELOCITY_STOP_THRESHOLD
@@ -35,9 +32,9 @@ class XArmSimBridge(MujocoSimBridgeBase):
     Lightweight, in-process backend that mimics the subset of the UFACTORY xArm
     SDK used by ``XArmDriver``.
 
-    The bridge keeps an internal joint state, emits periodic report callbacks,
-    and provides best-effort implementations for the large SDK surface so the
-    rest of the driver stack can operate without modification.
+    The bridge keeps an internal joint state and provides best-effort
+    implementations for the large SDK surface so the rest of the driver stack
+    can operate without modification.
     """
 
     def __init__(
@@ -45,8 +42,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         is_radian: bool,
         check_joint_limit: bool,
         num_joints: int,
-        report_type: str,
-        joint_state_rate: float,
         control_frequency: float,
     ):
         # Initialize base class (loads model, sets up threading, etc.)
@@ -57,8 +52,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         )
 
         self._is_radian = is_radian
-        self._report_type = 100 if report_type == "dev" else 5
-        self._joint_state_rate = joint_state_rate if joint_state_rate > 0 else 0.01
 
         # --- XArm-specific state variables --- #
         self._mode = 0
@@ -68,10 +61,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._warn_code = 0
         self._motion_enabled = True
 
-        # --- Additional threading for reports (XArm-specific) --- #
-        self._report_thread: threading.Thread | None = None
+        # --- Connection callback (XArm-specific) --- #
         self._connect_callback: Callable[[bool, bool], None] | None = None
-        self._report_callback: Callable[[dict], None] | None = None
 
         # --- Velocity control support --- #
         self._joint_velocity_targets = [0.0] * self._num_joints
@@ -228,25 +219,16 @@ class XArmSimBridge(MujocoSimBridgeBase):
         if enable:
             self._connect_callback = None
 
-    def release_report_callback(self, enable: bool) -> None:
-        if enable:
-            self._report_callback = None
-
     def register_connect_changed_callback(self, callback: Callable[[bool, bool], None]) -> None:
         self._connect_callback = callback
         if self.connected:
             callback(True, True)
-
-    def register_report_callback(self, callback: Callable[[dict], None]) -> None:
-        self._report_callback = callback
 
     # ------------------------------------------------------------------ #
     # Connection management
     # ------------------------------------------------------------------ #
     def connect(self) -> None:
         logger.info("XArmSimBridge: connect()")
-        with self._lock:
-            self._last_update_time = time.time()
 
         if self._connect_callback:
             self._connect_callback(True, True)
@@ -254,19 +236,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
         # Start base class simulation thread
         super().connect()
 
-        # Start report thread (XArm-specific)
-        if self._report_thread is None or not self._report_thread.is_alive():
-            self._report_thread = threading.Thread(
-                target=self._report_loop, name="XArmSimBridgeReport", daemon=True
-            )
-            self._report_thread.start()
-
     def disconnect(self) -> int:
         logger.info("XArmSimBridge: disconnect()")
-
-        # Stop report thread first
-        if self._report_thread and self._report_thread.is_alive():
-            self._report_thread.join(timeout=1.0)
 
         # Stop base class simulation thread
         super().disconnect()
@@ -333,43 +304,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             Tuple of (error_code, [serial_number, ...])
         """
         return (0, ["SIM-XARM-001"])
-
-    # ------------------------------------------------------------------ #
-    # Joint state helpers
-    # ------------------------------------------------------------------ #
-
-    def _notify_report(self) -> None:
-        callback = self._report_callback
-        if not callback:
-            return
-
-        with self._lock:
-            joints = list(self._joint_positions)
-            data = {
-                "state": self._state,
-                "mode": self._mode,
-                "error_code": 0,
-                "warn_code": 0,
-                "cmdnum": self._cmdnum,
-                "cartesian": self._estimate_cartesian_pose(joints),
-                "tcp_offset": [0.0] * 6,
-                "joints": joints,
-                "mtbrake": 0,
-                "mtable": int(self._motion_enabled),
-            }
-
-        try:
-            callback(data)
-        except Exception as exc:
-            logger.debug(f"XArmSimBridge report callback error: {exc}")
-
-    def _report_loop(self) -> None:
-        logger.info("XArmSimBridge: report loop started")
-        self._report_period = 1.0 / self._report_type
-        while not self._stop_event.is_set():
-            self._notify_report()
-            time.sleep(self._report_period)
-        logger.info("XArmSimBridge: report loop stopped")
 
     # ------------------------------------------------------------------ #
     # Joint / motion commands
@@ -543,7 +477,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         with self._lock:
             self._state = 4
             self._joint_velocities = [0.0] * self._num_joints
-        self._notify_report()
         return 0
 
     def clean_conf(self) -> int:

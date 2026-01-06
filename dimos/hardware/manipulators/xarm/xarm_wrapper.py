@@ -77,8 +77,6 @@ class XArmSDKWrapper(BaseManipulatorSDK):
                     is_radian=False,
                     check_joint_limit=True,
                     num_joints=self.dof,
-                    report_type="dev",
-                    joint_state_rate=float(control_rate),
                     control_frequency=float(control_rate),
                 )
                 # XArmSimBridge needs explicit connect() call (unlike hardware XArmAPI)

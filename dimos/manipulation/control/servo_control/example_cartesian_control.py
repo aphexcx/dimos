@@ -81,7 +81,6 @@ def main():
             XArmDriver,
             ip_address="192.168.1.210",
             xarm_type="xarm6",
-            report_type="dev",
             enable_on_start=True,
         )
 
