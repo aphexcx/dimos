@@ -330,13 +330,13 @@ class ManipulationClient:
         self, orientation_values: list[float] | None = None
     ) -> tuple[float, float, float]:
         """Get orientation (roll, pitch, yaw) from provided values or current EE pose.
-        
+
         Args:
             orientation_values: Optional list of orientation values [roll, pitch, yaw] or partial [roll] or [roll, pitch]
-        
+
         Returns:
             Tuple of (roll, pitch, yaw) in radians
-        
+
         Raises:
             RuntimeError: If orientation_values is not provided and current EE pose cannot be retrieved
         """
@@ -345,14 +345,12 @@ class ManipulationClient:
             pitch = orientation_values[1] if len(orientation_values) > 1 else 0.0
             yaw = orientation_values[2] if len(orientation_values) > 2 else 0.0
             return roll, pitch, yaw
-        
+
         # Get current EE pose and use its orientation
         ee_pose = self.get_ee_pose()
         if ee_pose is not None and len(ee_pose) >= 6:
             roll, pitch, yaw = ee_pose[3], ee_pose[4], ee_pose[5]
-            print(
-                f"Using current orientation: roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
-            )
+            print(f"Using current orientation: roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}")
             return roll, pitch, yaw
         else:
             # Raise error if EE pose not available
