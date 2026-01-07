@@ -76,23 +76,36 @@ from dimos.protocol.rpc import LCMRPC
 
 
 class ManipulationClient:
-    """Client for interacting with ManipulationModule via LCM RPC.
+    """Client for interacting with ManipulationModule and Driver via LCM RPC.
 
     Provides planning_tester.py-like functionality via RPC:
     - Plan paths (without executing) and preview in Drake/Meshcat
     - Execute planned trajectories in MuJoCo
     - Add/remove obstacles (visible in both Drake and MuJoCo)
+    - Control gripper (open/close/set position)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, driver_name: str = "XArmDriver") -> None:
+        """Initialize the manipulation client.
+        
+        Args:
+            driver_name: Name of the driver module ("XArmDriver" or "PiperDriver")
+        """
         self.rpc = LCMRPC()
         self.rpc.start()
-        self.module_name = "ManipulationModule"
-        print("ManipulationClient connected via LCM RPC")
+
+        # TODO: Make this automatically determined based on the driver name
+        self.manip_module = "ManipulationModule"
+        self.driver_module = driver_name
+        print(f"ManipulationClient connected via LCM RPC")
+        print(f"  - ManipulationModule: {self.manip_module}")
+        print(f"  - Driver: {self.driver_module}")
+        if driver_name == "XArmDriver":
+            print(f"  Note: For Piper, use --driver PiperDriver")
 
     def _call(self, method: str, *args, **kwargs) -> any:
         """Call an RPC method on ManipulationModule."""
-        topic = f"{self.module_name}/{method}"
+        topic = f"{self.manip_module}/{method}"
         try:
             result, _ = self.rpc.call_sync(topic, (args, kwargs), rpc_timeout=30.0)
             return result
@@ -101,6 +114,19 @@ class ManipulationClient:
             return None
         except Exception as e:
             print(f"RPC error: {e}")
+            return None
+
+    def _call_driver(self, method: str, *args, **kwargs) -> any:
+        """Call an RPC method on the Driver."""
+        topic = f"{self.driver_module}/{method}"
+        try:
+            result, _ = self.rpc.call_sync(topic, (args, kwargs), rpc_timeout=30.0)
+            return result
+        except TimeoutError:
+            print(f"Driver RPC call to '{method}' timed out")
+            return None
+        except Exception as e:
+            print(f"Driver RPC call to '{method}' failed: {e}")
             return None
 
     def get_state(self) -> str:
@@ -213,6 +239,63 @@ class ManipulationClient:
         """Stop the RPC client."""
         self.rpc.stop()
 
+    # =========================================================================
+    # Gripper Control Methods
+    # =========================================================================
+
+    def set_gripper_position(self, position: float, wait: bool = False) -> tuple[int, str] | None:
+        """Set gripper position.
+        
+        Args:
+            position: Target position
+                - XArm: 0-850 mm (0=open, 850=closed)
+                - Piper: 0-1000 (0=closed, 1000=open)
+            wait: Wait for completion
+            
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        return self._call_driver("set_gripper_position", position, wait=wait)
+
+    def get_gripper_position(self) -> tuple[int, float] | None:
+        """Get current gripper position.
+        
+        Returns:
+            Tuple of (error_code, position) or None on failure
+        """
+        return self._call_driver("get_gripper_position")
+
+    def open_gripper(self, wait: bool = False) -> tuple[int, str] | None:
+        """Open gripper fully.
+        
+        Args:
+            wait: Wait for completion
+            
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        # XArm: 0=open, Piper: 1000=open
+        # Try XArm first (most common), will auto-detect
+        if "Piper" in self.driver_module:
+            return self._call_driver("open_gripper")  # Piper has dedicated method
+        else:
+            return self._call_driver("set_gripper_position", 0.0, wait=wait)
+
+    def close_gripper(self, wait: bool = False) -> tuple[int, str] | None:
+        """Close gripper fully.
+        
+        Args:
+            wait: Wait for completion
+            
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        # XArm: 850=closed, Piper: 0=closed
+        if "Piper" in self.driver_module:
+            return self._call_driver("close_gripper")  # Piper has dedicated method
+        else:
+            return self._call_driver("set_gripper_position", 850.0, wait=wait)
+
 
 def interactive_mode(client: ManipulationClient) -> None:
     """Run interactive CLI mode."""
@@ -233,6 +316,11 @@ def interactive_mode(client: ManipulationClient) -> None:
     print("  preview [speed]          - Preview path in Drake/Meshcat")
     print("  execute                  - Execute planned trajectory in MuJoCo")
     print("  hasplan                  - Check if path is planned")
+    print("\nGripper Control:")
+    print("  open               - Open gripper")
+    print("  close              - Close gripper")
+    print("  gripper <pos>      - Set gripper position (XArm: 0-850, Piper: 0-1000)")
+    print("  gpos               - Get gripper position")
     print("\nObstacles:")
     print("  box name x y z w h d [r p y] - Add box obstacle")
     print("  sphere name x y z radius     - Add sphere obstacle")
@@ -288,6 +376,50 @@ def interactive_mode(client: ManipulationClient) -> None:
                     print(f"Meshcat URL: {url}")
                 else:
                     print("Visualization not enabled or URL not available")
+
+            # Gripper control
+            elif action == "open":
+                result = client.open_gripper()
+                if result:
+                    code, msg = result
+                    if code == 0:
+                        print(f"✓ Gripper opened: {msg}")
+                    else:
+                        print(f"✗ Failed to open gripper: {msg}")
+
+            elif action == "close":
+                result = client.close_gripper()
+                if result:
+                    code, msg = result
+                    if code == 0:
+                        print(f"✓ Gripper closed: {msg}")
+                    else:
+                        print(f"✗ Failed to close gripper: {msg}")
+
+            elif action == "gpos":
+                result = client.get_gripper_position()
+                if result:
+                    code, pos = result
+                    if code == 0:
+                        print(f"Gripper position: {pos:.1f}")
+                    else:
+                        print(f"✗ Failed to get gripper position")
+
+            elif action == "gripper":
+                if len(parts) >= 2:
+                    try:
+                        position = float(parts[1])
+                        result = client.set_gripper_position(position)
+                        if result:
+                            code, msg = result
+                            if code == 0:
+                                print(f"✓ Gripper position set: {msg}")
+                            else:
+                                print(f"✗ Failed to set gripper: {msg}")
+                    except ValueError:
+                        print("Usage: gripper <position>")
+                else:
+                    print("Usage: gripper <position>")
 
             # Immediate motion (plan + execute in one step)
             elif action == "pose":
@@ -507,13 +639,27 @@ def main() -> None:
     )
     parser.add_argument("--clear", action="store_true", help="Clear all obstacles")
 
+    # Gripper control
+    parser.add_argument("--open-gripper", action="store_true", help="Open gripper")
+    parser.add_argument("--close-gripper", action="store_true", help="Close gripper")
+    parser.add_argument("--gripper-pos", type=float, help="Set gripper position")
+    parser.add_argument("--get-gripper-pos", action="store_true", help="Get gripper position")
+
+    # Driver selection
+    parser.add_argument(
+        "--driver",
+        type=str,
+        default="XArmDriver",
+        help="Driver module name (default: XArmDriver, or use PiperDriver)",
+    )
+
     # Other
     parser.add_argument("--reset", action="store_true", help="Reset state")
     parser.add_argument("-i", "--interactive", action="store_true", help="Interactive mode")
 
     args = parser.parse_args()
 
-    client = ManipulationClient()
+    client = ManipulationClient(driver_name=args.driver)
 
     try:
         # If no args, default to interactive mode
@@ -543,6 +689,31 @@ def main() -> None:
         if args.url:
             url = client.get_viz_url()
             print(f"Meshcat URL: {url}" if url else "Visualization not available")
+
+        # Gripper control
+        if args.open_gripper:
+            result = client.open_gripper()
+            if result:
+                code, msg = result
+                print(f"Open gripper: code={code}, msg={msg}")
+
+        if args.close_gripper:
+            result = client.close_gripper()
+            if result:
+                code, msg = result
+                print(f"Close gripper: code={code}, msg={msg}")
+
+        if args.gripper_pos is not None:
+            result = client.set_gripper_position(args.gripper_pos)
+            if result:
+                code, msg = result
+                print(f"Set gripper position: code={code}, msg={msg}")
+
+        if args.get_gripper_pos:
+            result = client.get_gripper_position()
+            if result:
+                code, pos = result
+                print(f"Gripper position: {pos}")
 
         # Immediate motion
         if args.move_pose:
