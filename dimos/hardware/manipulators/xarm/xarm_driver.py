@@ -78,8 +78,11 @@ class XArmDriver(BaseManipulatorDriver):
         ]
 
         # Optional: Add gripper component if configured
-        if config.get('has_gripper', False):
-            from dimos.hardware.manipulators.xarm.components.gripper_control import GripperControlComponent
+        if config.get("has_gripper", False):
+            from dimos.hardware.manipulators.xarm.components.gripper_control import (
+                GripperControlComponent,
+            )
+
             components.append(GripperControlComponent(sdk))
             logger.info("Added GripperControlComponent")
 

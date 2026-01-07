@@ -37,14 +37,21 @@ class GripperControlComponent:
     """
     Component providing gripper control RPC methods for XArmDriver.
 
-    This component assumes the parent class has:
-    - self.arm: XArmAPI instance
-    - self.config: XArmDriverConfig instance
+    This component follows the component-based architecture pattern.
+    Dependencies are injected via constructor or setter methods.
     """
 
-    # Type hints for attributes expected from parent class
-    arm: "XArmAPI"
-    config: Any  # Config dict accessed as object (dict with attribute access)
+    def __init__(self, sdk=None):
+        """Initialize the gripper control component.
+
+        Args:
+            sdk: SDK wrapper instance (can be set later via set_sdk)
+        """
+        self.sdk = sdk
+
+    def set_sdk(self, sdk):
+        """Inject SDK dependency."""
+        self.sdk = sdk
 
     # =========================================================================
     # Standard xArm Gripper
@@ -100,7 +107,9 @@ class GripperControlComponent:
             timeout: Optional timeout for wait
         """
         try:
-            code = self.arm.set_gripper_position(position, wait=wait, speed=speed, timeout=timeout)
+            code = self.sdk.native_sdk.set_gripper_position(
+                position, wait=wait, speed=speed, timeout=timeout
+            )
             return (
                 code,
                 f"Gripper position set to {position}" if code == 0 else f"Error code: {code}",
@@ -297,7 +306,9 @@ class GripperControlComponent:
     ) -> tuple[int, str]:
         """Open Robotiq gripper."""
         try:
-            code = self.arm.robotiq_open(speed=speed, force=force, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.robotiq_open(
+                speed=speed, force=force, wait=wait, timeout=timeout
+            )
             return (code, "Robotiq gripper opened" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
@@ -308,7 +319,9 @@ class GripperControlComponent:
     ) -> tuple[int, str]:
         """Close Robotiq gripper."""
         try:
-            code = self.arm.robotiq_close(speed=speed, force=force, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.robotiq_close(
+                speed=speed, force=force, wait=wait, timeout=timeout
+            )
             return (code, "Robotiq gripper closed" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))

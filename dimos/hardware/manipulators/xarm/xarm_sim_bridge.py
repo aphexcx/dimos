@@ -589,7 +589,7 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """
         Provide best-effort implementations for the large surface of the
         hardware SDK that the simulation may not support yet.
-        
+
         This includes gripper methods like set_gripper_enable, set_gripper_mode,
         set_gripper_speed, get_gripper_err_code, clean_gripper_error, etc.
         """

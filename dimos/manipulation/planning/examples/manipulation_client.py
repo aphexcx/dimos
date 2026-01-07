@@ -87,7 +87,7 @@ class ManipulationClient:
 
     def __init__(self, driver_name: str = "XArmDriver") -> None:
         """Initialize the manipulation client.
-        
+
         Args:
             driver_name: Name of the driver module ("XArmDriver" or "PiperDriver")
         """
@@ -97,11 +97,11 @@ class ManipulationClient:
         # TODO: Make this automatically determined based on the driver name
         self.manip_module = "ManipulationModule"
         self.driver_module = driver_name
-        print(f"ManipulationClient connected via LCM RPC")
+        print("ManipulationClient connected via LCM RPC")
         print(f"  - ManipulationModule: {self.manip_module}")
         print(f"  - Driver: {self.driver_module}")
         if driver_name == "XArmDriver":
-            print(f"  Note: For Piper, use --driver PiperDriver")
+            print("  Note: For Piper, use --driver PiperDriver")
 
     def _call(self, method: str, *args, **kwargs) -> any:
         """Call an RPC method on ManipulationModule."""
@@ -245,13 +245,13 @@ class ManipulationClient:
 
     def set_gripper_position(self, position: float, wait: bool = False) -> tuple[int, str] | None:
         """Set gripper position.
-        
+
         Args:
             position: Target position
                 - XArm: 0-850 mm (0=open, 850=closed)
                 - Piper: 0-1000 (0=closed, 1000=open)
             wait: Wait for completion
-            
+
         Returns:
             Tuple of (error_code, message) or None on failure
         """
@@ -259,7 +259,7 @@ class ManipulationClient:
 
     def get_gripper_position(self) -> tuple[int, float] | None:
         """Get current gripper position.
-        
+
         Returns:
             Tuple of (error_code, position) or None on failure
         """
@@ -267,10 +267,10 @@ class ManipulationClient:
 
     def open_gripper(self, wait: bool = False) -> tuple[int, str] | None:
         """Open gripper fully.
-        
+
         Args:
             wait: Wait for completion
-            
+
         Returns:
             Tuple of (error_code, message) or None on failure
         """
@@ -283,10 +283,10 @@ class ManipulationClient:
 
     def close_gripper(self, wait: bool = False) -> tuple[int, str] | None:
         """Close gripper fully.
-        
+
         Args:
             wait: Wait for completion
-            
+
         Returns:
             Tuple of (error_code, message) or None on failure
         """
@@ -403,7 +403,7 @@ def interactive_mode(client: ManipulationClient) -> None:
                     if code == 0:
                         print(f"Gripper position: {pos:.1f}")
                     else:
-                        print(f"✗ Failed to get gripper position")
+                        print("✗ Failed to get gripper position")
 
             elif action == "gripper":
                 if len(parts) >= 2:
