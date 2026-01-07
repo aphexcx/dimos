@@ -21,6 +21,7 @@ Provides RPC methods for gripper control operations.
 from typing import Any
 
 from dimos.core import rpc
+from dimos.hardware.manipulators.base.components import component_api
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
@@ -67,7 +68,7 @@ class GripperControlComponent:
             Tuple of (success, message)
         """
         try:
-            result = self.piper.GripperCtrl(
+            result = self.sdk.native_sdk.GripperCtrl(
                 gripper_angle, gripper_effort, gripper_enable, gripper_state
             )
 
@@ -80,7 +81,7 @@ class GripperControlComponent:
             logger.error(f"set_gripper failed: {e}")
             return (False, str(e))
 
-    @rpc
+    @component_api
     def open_gripper(self, effort: int = 100) -> tuple[bool, str]:
         """
         Open gripper.
@@ -94,7 +95,7 @@ class GripperControlComponent:
         result: tuple[bool, str] = self.set_gripper(gripper_angle=1000, gripper_effort=effort)  # type: ignore[no-any-return]
         return result
 
-    @rpc
+    @component_api
     def close_gripper(self, effort: int = 100) -> tuple[bool, str]:
         """
         Close gripper.
