@@ -58,6 +58,7 @@ class PiperDriver(BaseManipulatorDriver):
             "enable_on_start",
             "control_rate",
             "monitor_rate",
+            "connection_type",
         ]
         for param in driver_params:
             if param in kwargs:

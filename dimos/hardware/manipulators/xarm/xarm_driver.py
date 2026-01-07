@@ -59,6 +59,7 @@ class XArmDriver(BaseManipulatorDriver):
             "has_force_torque",
             "control_rate",
             "monitor_rate",
+            "connection_type",
         ]
         for param in driver_params:
             if param in kwargs:
