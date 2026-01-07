@@ -17,6 +17,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+import mujoco
+
 from dimos.simulation.manipulators.mujoco_sim import MujocoSimBridgeBase
 from dimos.simulation.manipulators.mujoco_sim.constants import VELOCITY_STOP_THRESHOLD
 from dimos.utils.logging_config import setup_logger
@@ -84,6 +86,22 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._version_number = (1, 8, 103)
         self._core = self._CoreProxy(self)
 
+        # --- Gripper control support --- #
+        # Find gripper actuator ID (if it exists in the model)
+        # mj_name2id returns -1 if not found
+        self._gripper_actuator_id = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_ACTUATOR, "gripper"
+        )
+        if self._gripper_actuator_id >= 0:
+            self._gripper_position_target = 0.0  # Target position (0-850 mm)
+            self._gripper_position_current = 0.0  # Current position (0-850 mm)
+            logger.info("Gripper actuator found in MuJoCo model")
+        else:
+            # Gripper not found in model
+            self._gripper_position_target = 0.0
+            self._gripper_position_current = 0.0
+            logger.warning("Gripper actuator not found in MuJoCo model")
+
     # ============= Abstract Method Implementations =============
 
     def _apply_control(self) -> None:
@@ -94,6 +112,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
             else:
                 pos_targets = list(self._joint_position_targets)
             motion_enabled = self._motion_enabled
+            gripper_target = self._gripper_position_target
+            gripper_actuator_id = self._gripper_actuator_id
 
         if motion_enabled:
             if self._velocity_control:
@@ -119,6 +139,17 @@ class XArmSimBridge(MujocoSimBridgeBase):
                             self._data.ctrl[i] = pos_targets[i]
                     self._hold_positions = list(pos_targets)
 
+        # Apply gripper control (independent of motion_enabled)
+        if gripper_actuator_id >= 0:
+            # Convert XArm position (0-850 mm) to MuJoCo control (0-255)
+            # MuJoCo actuator uses ctrlrange="0 255", where 0=open, 255=closed
+            # XArm uses 0-850 where 0=open, 850=closed
+            gripper_ctrl = (gripper_target / 850.0) * 255.0
+            gripper_ctrl = max(0.0, min(255.0, gripper_ctrl))  # Clamp to valid range
+            with self._lock:
+                if gripper_actuator_id < self._model.nu:
+                    self._data.ctrl[gripper_actuator_id] = gripper_ctrl
+
     def _update_joint_state(self) -> None:
         """Update internal joint state from MuJoCo simulation."""
         with self._lock:
@@ -132,6 +163,13 @@ class XArmSimBridge(MujocoSimBridgeBase):
                     self._joint_efforts[i] = float(
                         self._data.qfrc_actuator[i] if i < len(self._data.qfrc_actuator) else 0.0
                     )
+
+            # Update gripper position from MuJoCo
+            if self._gripper_actuator_id >= 0 and self._gripper_actuator_id < self._model.nu:
+                # Read current gripper control value and convert back to XArm units (0-850)
+                gripper_ctrl = float(self._data.ctrl[self._gripper_actuator_id])
+                # Convert from MuJoCo control (0-255) to XArm position (0-850 mm)
+                self._gripper_position_current = (gripper_ctrl / 255.0) * 850.0
 
     # ------------------------------------------------------------------ #
     # Properties (matching XArmAPI interface)
@@ -489,6 +527,53 @@ class XArmSimBridge(MujocoSimBridgeBase):
         return 0
 
     # ------------------------------------------------------------------ #
+    # Gripper control methods
+    # ------------------------------------------------------------------ #
+
+    def set_gripper_position(
+        self,
+        position: float,
+        wait: bool = False,
+        speed: float | None = None,
+        timeout: float | None = None,
+    ) -> int:
+        """Set gripper position.
+
+        Args:
+            position: Target position (0-850 mm, 0=open, 850=closed)
+            wait: Wait for completion (simulated in sim, returns immediately)
+            speed: Optional speed override (not used in simulation)
+            timeout: Optional timeout for wait (not used in simulation)
+
+        Returns:
+            Error code (0 = success)
+        """
+        if self._gripper_actuator_id < 0:
+            logger.warning("Gripper not available in simulation model")
+            return -1
+
+        # Clamp position to valid range
+        position = max(0.0, min(850.0, float(position)))
+
+        with self._lock:
+            self._gripper_position_target = position
+            self._cmdnum += 1
+
+        logger.debug(f"Gripper position set to {position:.1f} mm")
+        return 0
+
+    def get_gripper_position(self) -> tuple[int, float]:
+        """Get current gripper position.
+
+        Returns:
+            Tuple of (error_code, position). Position is 0-850 mm (0=open, 850=closed).
+            Error code 0 = success.
+        """
+        with self._lock:
+            position = self._gripper_position_current
+        return (0, position)
+
+    # ------------------------------------------------------------------ #
     # Generic stubs for remaining SDK surface
     # ------------------------------------------------------------------ #
     def _simple_ok(self, *args, **kwargs) -> int:
@@ -504,6 +589,9 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """
         Provide best-effort implementations for the large surface of the
         hardware SDK that the simulation may not support yet.
+        
+        This includes gripper methods like set_gripper_enable, set_gripper_mode,
+        set_gripper_speed, get_gripper_err_code, clean_gripper_error, etc.
         """
         if name.startswith("set_") or name.startswith("clean_") or name.endswith("_enable"):
             return self._simple_ok
