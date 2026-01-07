@@ -143,8 +143,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
         if gripper_actuator_id >= 0:
             # Convert XArm position (0-850 mm) to MuJoCo control (0-255)
             # MuJoCo actuator uses ctrlrange="0 255", where 0=open, 255=closed
-            # XArm uses 0-850 where 0=open, 850=closed
-            gripper_ctrl = (gripper_target / 850.0) * 255.0
+            # XArm hardware uses 0-850 where 0=closed, 850=open (inverted!)
+            gripper_ctrl = ((850.0 - gripper_target) / 850.0) * 255.0
             gripper_ctrl = max(0.0, min(255.0, gripper_ctrl))  # Clamp to valid range
             with self._lock:
                 if gripper_actuator_id < self._model.nu:
@@ -169,7 +169,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
                 # Read current gripper control value and convert back to XArm units (0-850)
                 gripper_ctrl = float(self._data.ctrl[self._gripper_actuator_id])
                 # Convert from MuJoCo control (0-255) to XArm position (0-850 mm)
-                self._gripper_position_current = (gripper_ctrl / 255.0) * 850.0
+                # XArm hardware: 0=closed, 850=open (inverted from MuJoCo)
+                self._gripper_position_current = 850.0 - (gripper_ctrl / 255.0) * 850.0
 
     # ------------------------------------------------------------------ #
     # Properties (matching XArmAPI interface)
@@ -540,7 +541,7 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """Set gripper position.
 
         Args:
-            position: Target position (0-850 mm, 0=open, 850=closed)
+            position: Target position (0-850 mm, 0=closed, 850=open)
             wait: Wait for completion (simulated in sim, returns immediately)
             speed: Optional speed override (not used in simulation)
             timeout: Optional timeout for wait (not used in simulation)
@@ -566,7 +567,7 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """Get current gripper position.
 
         Returns:
-            Tuple of (error_code, position). Position is 0-850 mm (0=open, 850=closed).
+            Tuple of (error_code, position). Position is 0-850 mm (0=closed, 850=open).
             Error code 0 = success.
         """
         with self._lock:

@@ -274,12 +274,12 @@ class ManipulationClient:
         Returns:
             Tuple of (error_code, message) or None on failure
         """
-        # XArm: 0=open, Piper: 1000=open
+        # XArm: 850=open, Piper: 1000=open
         # Try XArm first (most common), will auto-detect
         if "Piper" in self.driver_module:
             return self._call_driver("open_gripper")  # Piper has dedicated method
         else:
-            return self._call_driver("set_gripper_position", 0.0, wait=wait)
+            return self._call_driver("set_gripper_position", 850.0, wait=wait)
 
     def close_gripper(self, wait: bool = False) -> tuple[int, str] | None:
         """Close gripper fully.
@@ -290,11 +290,11 @@ class ManipulationClient:
         Returns:
             Tuple of (error_code, message) or None on failure
         """
-        # XArm: 850=closed, Piper: 0=closed
+        # XArm: 0=closed, Piper: 0=closed
         if "Piper" in self.driver_module:
             return self._call_driver("close_gripper")  # Piper has dedicated method
         else:
-            return self._call_driver("set_gripper_position", 850.0, wait=wait)
+            return self._call_driver("set_gripper_position", 0.0, wait=wait)
 
     def enable_gripper(self) -> tuple[int, str] | None:
         """Enable gripper (XArm hardware only).
