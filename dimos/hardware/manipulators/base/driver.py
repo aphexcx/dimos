@@ -219,6 +219,12 @@ class BaseManipulatorDriver(Module):
                 # Store in rpc_methods dict for backward compatibility
                 self.rpc_methods[method_name] = wrapper
 
+                # Register with RPC server (since these are instance methods added after __init__)
+                if hasattr(self, 'rpc') and self.rpc is not None:
+                    topic = f"{self.__class__.__name__}/{method_name}"
+                    self.rpc.serve_rpc(wrapper, topic)
+                    self.logger.debug(f"Registered RPC endpoint: {topic}")
+
                 # Track exposed method name for cleanup
                 self._exposed_component_apis.add(method_name)
 
