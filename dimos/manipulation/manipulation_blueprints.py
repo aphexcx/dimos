@@ -97,7 +97,7 @@ xarm6_manipulation = autoconnect(
     xarm_driver(
         ip="192.168.1.235",
         dof=6,
-        has_gripper=False,
+        has_gripper=True,  # Enable gripper control
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
@@ -143,7 +143,7 @@ xarm7_manipulation = autoconnect(
     xarm_driver(
         ip="192.168.1.235",
         dof=7,
-        has_gripper=False,
+        has_gripper=True,  # Enable gripper control
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
