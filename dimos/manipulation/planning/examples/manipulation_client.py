@@ -296,6 +296,36 @@ class ManipulationClient:
         else:
             return self._call_driver("set_gripper_position", 850.0, wait=wait)
 
+    def enable_gripper(self) -> tuple[int, str] | None:
+        """Enable gripper (XArm hardware only).
+
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        return self._call_driver("set_gripper_enable", 1)
+
+    def set_gripper_mode(self, mode: int = 0) -> tuple[int, str] | None:
+        """Set gripper mode (XArm hardware only).
+
+        Args:
+            mode: Gripper mode (0=location, 1=speed, 2=current)
+
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        return self._call_driver("set_gripper_mode", mode)
+
+    def set_gripper_speed(self, speed: float = 5000) -> tuple[int, str] | None:
+        """Set gripper speed (XArm hardware only).
+
+        Args:
+            speed: Speed in r/min (recommended: 1000-5000)
+
+        Returns:
+            Tuple of (error_code, message) or None on failure
+        """
+        return self._call_driver("set_gripper_speed", speed)
+
 
 def interactive_mode(client: ManipulationClient) -> None:
     """Run interactive CLI mode."""
@@ -326,6 +356,14 @@ def interactive_mode(client: ManipulationClient) -> None:
     print("  sphere name x y z radius     - Add sphere obstacle")
     print("  remove id          - Remove obstacle")
     print("  clear              - Clear all obstacles")
+    print("\nGripper Control:")
+    print("  open               - Open gripper")
+    print("  close              - Close gripper")
+    print("  gripper <pos>      - Set gripper position (0-850)")
+    print("  gpos               - Get current gripper position")
+    print("  genable            - Enable gripper (hardware only)")
+    print("  gmode [0|1|2]      - Set gripper mode (hardware only)")
+    print("  gspeed [rpm]       - Set gripper speed (hardware only)")
     print("\nOther:")
     print("  collision j1 j2... - Check collision at joint config")
     print("  reset              - Reset state to IDLE")
@@ -420,6 +458,45 @@ def interactive_mode(client: ManipulationClient) -> None:
                         print("Usage: gripper <position>")
                 else:
                     print("Usage: gripper <position>")
+
+            elif action == "genable":
+                result = client.enable_gripper()
+                if result:
+                    code, msg = result
+                    if code == 0:
+                        print(f"✓ Gripper enabled: {msg}")
+                    else:
+                        print(f"✗ Failed to enable gripper: {msg}")
+
+            elif action == "gmode":
+                mode = 0  # Default to location mode
+                if len(parts) >= 2:
+                    try:
+                        mode = int(parts[1])
+                    except ValueError:
+                        pass
+                result = client.set_gripper_mode(mode)
+                if result:
+                    code, msg = result
+                    if code == 0:
+                        print(f"✓ {msg}")
+                    else:
+                        print(f"✗ Failed to set gripper mode: {msg}")
+
+            elif action == "gspeed":
+                speed = 5000  # Default speed
+                if len(parts) >= 2:
+                    try:
+                        speed = float(parts[1])
+                    except ValueError:
+                        pass
+                result = client.set_gripper_speed(speed)
+                if result:
+                    code, msg = result
+                    if code == 0:
+                        print(f"✓ {msg}")
+                    else:
+                        print(f"✗ Failed to set gripper speed: {msg}")
 
             # Immediate motion (plan + execute in one step)
             elif action == "pose":
