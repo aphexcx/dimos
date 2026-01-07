@@ -730,10 +730,10 @@ class DrakeWorld:
             self._set_positions_internal(self._plant_context, robot_id, positions)
 
             # Update visualization
-            if self._meshcat_visualizer is not None:
-                self._meshcat_visualizer.ForcedPublish(
-                    self._diagram.GetSubsystemContext(self._meshcat_visualizer, self._live_context)
-                )
+            # if self._meshcat_visualizer is not None:
+            #     self._meshcat_visualizer.ForcedPublish(
+            #         self._diagram.GetSubsystemContext(self._meshcat_visualizer, self._live_context)
+            #     )
 
     # ============= State Operations (context-based) =============
 

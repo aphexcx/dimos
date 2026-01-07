@@ -145,6 +145,8 @@ class DrakePlanner:
         start_tree = [TreeNode(config=q_start.copy())]
         goal_tree = [TreeNode(config=q_goal.copy())]
 
+        trees_swapped = False  # Track if trees have been swapped an odd number of times
+
         for iteration in range(max_iterations):
             # Check timeout
             if time.time() - start_time > timeout:
@@ -171,6 +173,10 @@ class DrakePlanner:
                     # Trees connected! Extract path
                     path = self._extract_path(extended_node, connected_node)
 
+                    # If trees were swapped, path is from goal to start - reverse it
+                    if trees_swapped:
+                        path = list(reversed(path))
+
                     # Simplify path
                     path = self._simplify_path(world, robot_id, path)
 
@@ -182,6 +188,7 @@ class DrakePlanner:
 
             # Swap trees
             start_tree, goal_tree = goal_tree, start_tree
+            trees_swapped = not trees_swapped
 
         return _create_failure_result(
             PlanningStatus.NO_SOLUTION,
