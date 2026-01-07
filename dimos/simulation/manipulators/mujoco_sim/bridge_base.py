@@ -33,9 +33,7 @@ import mujoco.viewer as viewer
 from dimos.simulation.manipulators.mujoco_sim.constants import (
     DEFAULT_CONTROL_FREQUENCY,
     MIN_CONTROL_FREQUENCY,
-    POSITION_ZERO_THRESHOLD,
     THREAD_JOIN_TIMEOUT,
-    VELOCITY_STOP_THRESHOLD,
 )
 from dimos.simulation.manipulators.mujoco_sim.model_utils import load_manipulator_model
 from dimos.utils.logging_config import setup_logger

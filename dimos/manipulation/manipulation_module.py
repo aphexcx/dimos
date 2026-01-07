@@ -51,6 +51,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import logging
 import threading
 from typing import TYPE_CHECKING
 
@@ -70,12 +71,11 @@ from dimos.manipulation.utils import pose_from_xyzrpy
 # These must be imported at runtime (not TYPE_CHECKING) for In/Out port creation
 from dimos.msgs.sensor_msgs import JointState  # noqa: TC001
 from dimos.msgs.trajectory_msgs import JointTrajectory  # noqa: TC001
-from dimos.utils.logging_config import setup_logger
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 
 class ManipulationState(Enum):
@@ -104,8 +104,6 @@ class ManipulationModuleConfig(ModuleConfig):
     # For xacro files that use $(find package_name)
     package_paths: dict[str, str] = field(default_factory=dict)
     xacro_args: dict[str, str] = field(default_factory=dict)
-    # Collision exclusion pairs for parallel linkage mechanisms (e.g., grippers)
-    collision_exclusion_pairs: list[tuple[str, str]] = field(default_factory=list)
 
 
 class ManipulationModule(Module):
@@ -177,10 +175,22 @@ class ManipulationModule(Module):
         # Initialize planning stack
         self._initialize_planning()
 
-        # Subscribe to joint state via port
-        if self.joint_state is not None:
-            self.joint_state.subscribe(self._on_joint_state)
-            logger.info("Subscribed to joint_state port")
+        # Subscribe to joint state
+        try:
+            if self.joint_state is not None:
+                logger.info(f"joint_state port exists: {self.joint_state}")
+                logger.info(
+                    f"joint_state._transport: {getattr(self.joint_state, '_transport', 'N/A')}"
+                )
+                self.joint_state.subscribe(self._on_joint_state)
+                logger.info("Subscribed to joint_state successfully")
+            else:
+                logger.warning("joint_state port is None - no transport configured!")
+        except Exception as e:
+            logger.warning(f"Failed to subscribe to joint_state: {e}")
+            import traceback
+
+            logger.warning(traceback.format_exc())
 
         logger.info("ManipulationModule started")
 
@@ -209,7 +219,6 @@ class ManipulationModule(Module):
             package_paths=config.package_paths,
             xacro_args=config.xacro_args,
             auto_convert_meshes=True,
-            collision_exclusion_pairs=config.collision_exclusion_pairs,
         )
 
         # Create world monitor
@@ -225,8 +234,6 @@ class ManipulationModule(Module):
             url = self._world_monitor.get_meshcat_url()
             if url:
                 logger.info(f"Meshcat visualization: {url}")
-            # Start visualization thread for live updates (10Hz to avoid overhead)
-            self._world_monitor.start_visualization_thread(rate_hz=10.0)
 
         # Create planner
         self._planner = create_planner(name="rrt_connect")
@@ -247,26 +254,10 @@ class ManipulationModule(Module):
 
     def _on_joint_state(self, msg: JointState) -> None:
         """Callback when joint state received from driver."""
-        try:
-            # Store latest positions
-            self._latest_joint_positions = list(msg.position[:6])
-
-            # Periodic debug logging (every 100 messages)
-            self._js_count = getattr(self, "_js_count", 0) + 1
-            if self._js_count % 100 == 0:
-                logger.debug(
-                    f"[JointState #{self._js_count}] positions: {[f'{p:.3f}' for p in self._latest_joint_positions]}"
-                )
-
-            # Forward to world monitor for Drake state synchronization
-            if self._world_monitor is not None:
-                self._world_monitor.on_joint_state(msg, self._robot_id)
-
-        except Exception as e:
-            logger.error(f"[ManipulationModule] Exception in _on_joint_state: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
+        if self._world_monitor is not None:
+            self._world_monitor.on_joint_state(msg, self._robot_id)
+        else:
+            logger.warning("_on_joint_state: world_monitor is None!")
 
     # =========================================================================
     # RPC Methods
@@ -383,10 +374,6 @@ class ManipulationModule(Module):
             self._state = ManipulationState.FAULT
             self._error_message = "No joint state"
             return False
-
-        # DEBUG: Log the start position being used for planning
-        logger.info(f"[DEBUG] Planning from q_start: {start}")
-        logger.info(f"[DEBUG] Planning to q_goal: {goal}")
 
         # Plan collision-free path
         result = self._planner.plan_joint_path(
@@ -642,10 +629,6 @@ class ManipulationModule(Module):
             self._error_message = "No joint state"
             return False
 
-        # DEBUG: Log the start position being used for planning
-        logger.info(f"[DEBUG] Planning from q_start: {start}")
-        logger.info(f"[DEBUG] Planning to q_goal: {goal}")
-
         # Plan collision-free path
         result = self._planner.plan_joint_path(
             world=self._world_monitor.world,
@@ -803,15 +786,9 @@ class ManipulationModule(Module):
             "state_monitor_exists": False,
             "state_monitor_running": False,
             "state_age": None,
-            "js_msg_count": getattr(self, "_js_count", 0),
-            "module_positions": None,
             "monitor_positions": None,
             "live_context_positions": None,
         }
-
-        # Positions stored directly in ManipulationModule
-        if hasattr(self, "_latest_joint_positions") and self._latest_joint_positions:
-            info["module_positions"] = [round(p, 4) for p in self._latest_joint_positions]
 
         if self._world_monitor is not None:
             state_monitor = self._world_monitor.get_state_monitor(self._robot_id)
@@ -819,8 +796,7 @@ class ManipulationModule(Module):
             if state_monitor is not None:
                 info["state_monitor_running"] = state_monitor.is_running()
                 age = state_monitor.get_state_age()
-                info["state_age"] = round(age, 3) if age is not None else None
-                info["wsm_msg_count"] = getattr(state_monitor, "_msg_count", 0)
+                info["state_age"] = age
                 positions = state_monitor.get_current_positions()
                 if positions is not None:
                     info["monitor_positions"] = [round(p, 4) for p in positions]
@@ -940,11 +916,6 @@ class ManipulationModule(Module):
     def stop(self) -> None:
         """Stop the manipulation module."""
         logger.info("Stopping ManipulationModule")
-
-        # Stop world monitor (includes visualization thread)
-        if self._world_monitor is not None:
-            self._world_monitor.stop_all_monitors()
-
         super().stop()
 
 

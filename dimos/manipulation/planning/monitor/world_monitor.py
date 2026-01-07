@@ -47,6 +47,7 @@ Example:
 from __future__ import annotations
 
 from contextlib import contextmanager
+import logging
 import threading
 from typing import TYPE_CHECKING, Any
 
@@ -62,7 +63,6 @@ from dimos.manipulation.planning.spec import (
     ObstacleType,
     RobotModelConfig,
 )
-from dimos.utils.logging_config import setup_logger
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -72,7 +72,7 @@ if TYPE_CHECKING:
     from dimos.manipulation.planning.spec import WorldSpec
     from dimos.msgs.sensor_msgs import JointState
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
 
 class WorldMonitor:
@@ -157,11 +157,6 @@ class WorldMonitor:
         # Sub-monitors
         self._state_monitors: dict[str, WorldStateMonitor] = {}
         self._obstacle_monitor: WorldObstacleMonitor | None = None
-
-        # Visualization thread (publishes to Meshcat at a fixed rate)
-        self._viz_thread: threading.Thread | None = None
-        self._viz_stop_event = threading.Event()
-        self._viz_rate_hz: float = 10.0  # Default 10Hz
 
     # ============= Robot Management =============
 
@@ -342,10 +337,7 @@ class WorldMonitor:
             logger.info("Obstacle monitor started")
 
     def stop_all_monitors(self) -> None:
-        """Stop all monitors and visualization thread."""
-        # Stop visualization thread first (outside lock to avoid deadlock)
-        self.stop_visualization_thread()
-
+        """Stop all monitors."""
         with self._lock:
             for _robot_id, monitor in self._state_monitors.items():
                 monitor.stop()
@@ -366,21 +358,13 @@ class WorldMonitor:
             msg: JointState message
             robot_id: Specific robot to update (broadcasts to all if None)
         """
-        try:
-            if robot_id is not None:
-                if robot_id in self._state_monitors:
-                    self._state_monitors[robot_id].on_joint_state(msg)
-                else:
-                    logger.warning(f"No state monitor for robot_id: {robot_id}")
-            else:
-                # Broadcast to all monitors
-                for monitor in self._state_monitors.values():
-                    monitor.on_joint_state(msg)
-        except Exception as e:
-            logger.error(f"[WorldMonitor] Exception in on_joint_state: {e}")
-            import traceback
-
-            logger.error(traceback.format_exc())
+        if robot_id is not None:
+            if robot_id in self._state_monitors:
+                self._state_monitors[robot_id].on_joint_state(msg)
+        else:
+            # Broadcast to all monitors
+            for monitor in self._state_monitors.values():
+                monitor.on_joint_state(msg)
 
     def on_collision_object(self, msg: CollisionObjectMessage) -> None:
         """Handle collision object message."""
@@ -619,57 +603,6 @@ class WorldMonitor:
         """Force publish current state to visualization."""
         if hasattr(self._world, "publish_to_meshcat"):
             self._world.publish_to_meshcat()
-
-    def start_visualization_thread(self, rate_hz: float = 10.0) -> None:
-        """Start background thread that updates Meshcat visualization.
-
-        This allows live visualization without blocking the LCM callback thread.
-        The thread publishes the current robot state to Meshcat at the specified rate.
-
-        Args:
-            rate_hz: Visualization update rate in Hz (default: 10Hz)
-        """
-        if self._viz_thread is not None and self._viz_thread.is_alive():
-            logger.warning("Visualization thread already running")
-            return
-
-        if not hasattr(self._world, "publish_to_meshcat"):
-            logger.warning("World does not support Meshcat visualization")
-            return
-
-        self._viz_rate_hz = rate_hz
-        self._viz_stop_event.clear()
-        self._viz_thread = threading.Thread(
-            target=self._visualization_loop,
-            name="MeshcatVizThread",
-            daemon=True,
-        )
-        self._viz_thread.start()
-        logger.info(f"Visualization thread started at {rate_hz}Hz")
-
-    def stop_visualization_thread(self) -> None:
-        """Stop the visualization thread."""
-        if self._viz_thread is None:
-            return
-
-        self._viz_stop_event.set()
-        self._viz_thread.join(timeout=1.0)
-        if self._viz_thread.is_alive():
-            logger.warning("Visualization thread did not stop cleanly")
-        self._viz_thread = None
-        logger.info("Visualization thread stopped")
-
-    def _visualization_loop(self) -> None:
-        """Internal: Visualization update loop."""
-        import time
-
-        period = 1.0 / self._viz_rate_hz
-        while not self._viz_stop_event.is_set():
-            try:
-                self._world.publish_to_meshcat()
-            except Exception as e:
-                logger.debug(f"Visualization publish failed: {e}")
-            time.sleep(period)
 
     # ============= Direct World Access =============
 

@@ -25,6 +25,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import mujoco
+
 from dimos.simulation.manipulators.mujoco_sim import MujocoSimBridgeBase
 from dimos.utils.logging_config import setup_logger
 
@@ -110,6 +112,22 @@ class PiperSimBridge(MujocoSimBridgeBase):
             for i in range(self._num_joints):
                 self._joint_positions_piper[i] = self._joint_positions[i] * RAD_TO_PIPER
 
+        # --- Gripper control support --- #
+        # Find gripper actuator ID (if it exists in the model)
+        # mj_name2id returns -1 if not found
+        self._gripper_actuator_id = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_ACTUATOR, "gripper"
+        )
+        if self._gripper_actuator_id >= 0:
+            self._gripper_position_target = 0.0  # Target position (0-1000, 0=closed, 1000=open)
+            self._gripper_position_current = 0.0  # Current position (0-1000)
+            logger.info("Gripper actuator found in MuJoCo model")
+        else:
+            # Gripper not found in model
+            self._gripper_position_target = 0.0
+            self._gripper_position_current = 0.0
+            logger.warning("Gripper actuator not found in MuJoCo model")
+
     # ============= Abstract Method Implementations =============
 
     def _apply_control(self) -> None:
@@ -117,12 +135,24 @@ class PiperSimBridge(MujocoSimBridgeBase):
         with self._lock:
             pos_targets = list(self._joint_position_targets)
             enabled = self._enabled
+            gripper_target = self._gripper_position_target
+            gripper_actuator_id = self._gripper_actuator_id
 
         # Apply control if enabled
         if enabled:
             for i in range(self._num_joints):
                 if i < self._model.nu:
                     self._data.ctrl[i] = pos_targets[i]
+
+        # Apply gripper control (independent of enabled state)
+        if gripper_actuator_id >= 0:
+            # Convert Piper gripper units (0-1000) to MuJoCo position (0-0.035)
+            # 0 = closed, 1000 = open
+            gripper_ctrl = (gripper_target / 1000.0) * 0.035
+            gripper_ctrl = max(0.0, min(0.035, gripper_ctrl))  # Clamp to valid range
+            with self._lock:
+                if gripper_actuator_id < self._model.nu:
+                    self._data.ctrl[gripper_actuator_id] = gripper_ctrl
 
     def _update_joint_state(self) -> None:
         """Update internal joint state from MuJoCo simulation."""
@@ -132,6 +162,13 @@ class PiperSimBridge(MujocoSimBridgeBase):
                 self._joint_positions[i] = float(self._data.qpos[i])
                 # Store in Piper units (0.001 degrees)
                 self._joint_positions_piper[i] = self._data.qpos[i] * RAD_TO_PIPER
+
+            # Update gripper position from MuJoCo
+            if self._gripper_actuator_id >= 0 and self._gripper_actuator_id < self._model.nu:
+                # Read current gripper control value and convert back to Piper units (0-1000)
+                gripper_ctrl = float(self._data.ctrl[self._gripper_actuator_id])
+                # Convert from MuJoCo position (0-0.035) to Piper units (0-1000)
+                self._gripper_position_current = (gripper_ctrl / 0.035) * 1000.0
 
     # ============= Connection Management =============
 
@@ -253,20 +290,42 @@ class PiperSimBridge(MujocoSimBridgeBase):
             self._err_code = 0
         logger.info("PiperSimBridge: Errors cleared")
 
-    # ============= Optional: Gripper =============
+    # ============= Gripper Control =============
 
-    def GripperCtrl(self, percentage: int) -> None:
+    def GripperCtrl(
+        self,
+        gripper_angle: int,
+        gripper_effort: int = 100,
+        gripper_enable: int = 0x01,
+        gripper_state: int = 0x00,
+    ) -> bool:
         """Control gripper (mimics C_PiperInterface_V2.GripperCtrl).
 
         Args:
-            percentage: Gripper opening 0-100
-        """
-        logger.debug(f"PiperSimBridge: GripperCtrl({percentage})")
-
-    def GetGripperState(self) -> int:
-        """Get gripper state.
+            gripper_angle: Gripper angle (0-1000, 0=closed, 1000=open)
+            gripper_effort: Gripper effort/force (0-1000, not used in sim)
+            gripper_enable: Gripper enable (0x00=disabled, 0x01=enabled, not used in sim)
+            gripper_state: Gripper state (not used in sim)
 
         Returns:
-            Gripper position 0-100
+            True if successful
         """
-        return 0
+        # Clamp gripper angle to valid range
+        gripper_angle = max(0, min(1000, int(gripper_angle)))
+
+        with self._lock:
+            self._gripper_position_target = float(gripper_angle)
+
+        logger.debug(f"PiperSimBridge: GripperCtrl angle={gripper_angle}")
+        return True
+
+    def GetGripperState(self) -> int:
+        """Get gripper state (mimics C_PiperInterface_V2.GetGripperState).
+
+        Returns:
+            Gripper position 0-100 (percentage)
+        """
+        with self._lock:
+            # Convert from 0-1000 to 0-100
+            position_pct = int(self._gripper_position_current / 10.0)
+        return position_pct

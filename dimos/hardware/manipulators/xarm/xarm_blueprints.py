@@ -225,7 +225,7 @@ xarm7_trajectory_sim = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
         dof=7,  # XArm7
-        has_gripper=False,
+        has_gripper=True,  # Gripper supported in simulation
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
@@ -255,7 +255,7 @@ xarm6_trajectory_sim = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
         dof=6,  # XArm6
-        has_gripper=False,
+        has_gripper=True,  # Gripper supported in simulation
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,

@@ -66,20 +66,6 @@ def _get_xarm_package_paths() -> dict[str, str]:
     return {"xarm_description": str(base / "xarm/xarm_description")}
 
 
-# XArm gripper collision exclusions (parallel linkage mechanism)
-# These link pairs legitimately overlap due to mimic joints
-XARM_GRIPPER_COLLISION_EXCLUSIONS: list[tuple[str, str]] = [
-    ("right_inner_knuckle", "right_outer_knuckle"),
-    ("right_inner_knuckle", "right_finger"),
-    ("left_inner_knuckle", "left_outer_knuckle"),
-    ("left_inner_knuckle", "left_finger"),
-    # Finger-to-finger when gripper is closed
-    ("left_finger", "right_finger"),
-    ("left_outer_knuckle", "right_outer_knuckle"),
-    ("left_inner_knuckle", "right_inner_knuckle"),
-]
-
-
 # Path to piper URDF
 def _get_piper_urdf_path() -> str:
     """Get path to piper URDF."""
@@ -111,25 +97,24 @@ xarm6_manipulation = autoconnect(
     xarm_driver(
         ip="192.168.1.210",
         dof=6,
-        has_gripper=False,
+        has_gripper=True,  # Enable gripper control
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
-        connection_type="sim",  # Use "hardware" for real robot
+        connection_type="hardware",  # Use "hardware" for real robot
     ),
     manipulation_module(
         robot_urdf_path=_get_xarm_urdf_path(),
         robot_name="xarm6",
         joint_names=["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
-        end_effector_link="link_tcp",  # Gripper TCP
+        end_effector_link="link6",
         base_link="link_base",
         max_velocity=1.0,
         max_acceleration=2.0,
         planning_timeout=10.0,
         enable_viz=True,
         package_paths=_get_xarm_package_paths(),
-        xacro_args={"dof": "6", "limited": "true", "add_gripper": "true"},
-        collision_exclusion_pairs=XARM_GRIPPER_COLLISION_EXCLUSIONS,
+        xacro_args={"dof": "6", "limited": "true"},
     ),
     joint_trajectory_controller(
         control_frequency=100.0,
@@ -156,13 +141,13 @@ xarm6_manipulation = autoconnect(
 
 xarm7_manipulation = autoconnect(
     xarm_driver(
-        ip="192.168.1.235",
+        ip="192.168.1.210",
         dof=7,
-        has_gripper=False,
+        has_gripper=True,  # Enable gripper control
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
-        connection_type="sim",  # Use "hardware" for real robot
+        connection_type="hardware",  # Use "hardware" for real robot
     ),
     manipulation_module(
         robot_urdf_path=_get_xarm_urdf_path(),
@@ -203,15 +188,14 @@ xarm6_planner_only = manipulation_module(
     robot_urdf_path=_get_xarm_urdf_path(),
     robot_name="xarm6",
     joint_names=["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
-    end_effector_link="link_tcp",  # Gripper TCP
+    end_effector_link="link6",
     base_link="link_base",
     max_velocity=1.0,
     max_acceleration=2.0,
     planning_timeout=10.0,
     enable_viz=True,
     package_paths=_get_xarm_package_paths(),
-    xacro_args={"dof": "6", "limited": "true", "add_gripper": "true"},
-    collision_exclusion_pairs=XARM_GRIPPER_COLLISION_EXCLUSIONS,
+    xacro_args={"dof": "6", "limited": "true"},
 ).transports(
     {
         # Subscribe to joint state from driver
@@ -243,7 +227,7 @@ piper_manipulation = autoconnect(
         enable_on_start=True,
         control_rate=100,
         monitor_rate=10,
-        connection_type="sim",  # Simulation mode
+        connection_type="hardware",  # Simulation mode
     ),
     manipulation_module(
         robot_urdf_path=_get_piper_urdf_path(),
@@ -277,8 +261,6 @@ piper_manipulation = autoconnect(
 
 
 __all__ = [
-    # Collision exclusion constants for custom configurations
-    "XARM_GRIPPER_COLLISION_EXCLUSIONS",
     "piper_manipulation",
     "xarm6_manipulation",
     "xarm6_planner_only",

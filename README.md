@@ -60,6 +60,9 @@ We are shipping a first look at the DIMOS x Unitree Go2 integration, allowing fo
 # Install Nix
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
+# make sure flakes are enabled
+mkdir -p "$HOME/.config/nix"; echo "experimental-features = nix-command flakes" >> "$HOME/.config/nix/nix.conf"
+
 # clone the repository
 git clone --branch dev --single-branch https://github.com/dimensionalOS/dimos.git
 
@@ -69,6 +72,8 @@ nix develop
 
 # You should be able to follow the instructions below as well for a more manual installation
 ```
+
+<!-- TODO: add check for `ulimit -n` on MacOS (gets triggered with ONNX with CoreML gets used, too many files). Should ask the user if they want to up their limit -->
 
 ---
 ## Python Installation
@@ -260,7 +265,7 @@ yarn dev # you may need to run sudo if previously built via Docker
 from dimos.robot.unitree.unitree_go2 import UnitreeGo2
 from dimos.robot.unitree.unitree_skills import MyUnitreeSkills
 from dimos.robot.unitree.unitree_ros_control import UnitreeROSControl
-from dimos.agents.agent import OpenAIAgent
+from dimos.agents_deprecated.agent import OpenAIAgent
 
 # Initialize robot
 robot = UnitreeGo2(ip=robot_ip,

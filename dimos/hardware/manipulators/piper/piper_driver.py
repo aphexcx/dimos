@@ -77,9 +77,13 @@ class PiperDriver(BaseManipulatorDriver):
         ]
 
         # Optional: Add gripper component if configured
-        # if config.get('has_gripper', False):
-        #     from dimos.hardware.manipulators.base.components import StandardGripperComponent
-        #     components.append(StandardGripperComponent(sdk))
+        if config.get("has_gripper", False):
+            from dimos.hardware.manipulators.piper.components.gripper_control import (
+                GripperControlComponent,
+            )
+
+            components.append(GripperControlComponent(sdk))
+            logger.info("Added GripperControlComponent")
 
         # Remove any kwargs that would conflict with explicit arguments
         kwargs.pop("sdk", None)

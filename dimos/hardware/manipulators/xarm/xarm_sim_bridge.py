@@ -15,10 +15,9 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
-import threading
-import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
+
+import mujoco
 
 from dimos.simulation.manipulators.mujoco_sim import MujocoSimBridgeBase
 from dimos.simulation.manipulators.mujoco_sim.constants import VELOCITY_STOP_THRESHOLD
@@ -35,9 +34,9 @@ class XArmSimBridge(MujocoSimBridgeBase):
     Lightweight, in-process backend that mimics the subset of the UFACTORY xArm
     SDK used by ``XArmDriver``.
 
-    The bridge keeps an internal joint state, emits periodic report callbacks,
-    and provides best-effort implementations for the large SDK surface so the
-    rest of the driver stack can operate without modification.
+    The bridge keeps an internal joint state and provides best-effort
+    implementations for the large SDK surface so the rest of the driver stack
+    can operate without modification.
     """
 
     def __init__(
@@ -45,8 +44,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         is_radian: bool,
         check_joint_limit: bool,
         num_joints: int,
-        report_type: str,
-        joint_state_rate: float,
         control_frequency: float,
     ):
         # Initialize base class (loads model, sets up threading, etc.)
@@ -57,8 +54,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         )
 
         self._is_radian = is_radian
-        self._report_type = 100 if report_type == "dev" else 5
-        self._joint_state_rate = joint_state_rate if joint_state_rate > 0 else 0.01
 
         # --- XArm-specific state variables --- #
         self._mode = 0
@@ -68,10 +63,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._warn_code = 0
         self._motion_enabled = True
 
-        # --- Additional threading for reports (XArm-specific) --- #
-        self._report_thread: threading.Thread | None = None
+        # --- Connection callback (XArm-specific) --- #
         self._connect_callback: Callable[[bool, bool], None] | None = None
-        self._report_callback: Callable[[dict], None] | None = None
 
         # --- Velocity control support --- #
         self._joint_velocity_targets = [0.0] * self._num_joints
@@ -93,6 +86,22 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._version_number = (1, 8, 103)
         self._core = self._CoreProxy(self)
 
+        # --- Gripper control support --- #
+        # Find gripper actuator ID (if it exists in the model)
+        # mj_name2id returns -1 if not found
+        self._gripper_actuator_id = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_ACTUATOR, "gripper"
+        )
+        if self._gripper_actuator_id >= 0:
+            self._gripper_position_target = 0.0  # Target position (0-850 mm)
+            self._gripper_position_current = 0.0  # Current position (0-850 mm)
+            logger.info("Gripper actuator found in MuJoCo model")
+        else:
+            # Gripper not found in model
+            self._gripper_position_target = 0.0
+            self._gripper_position_current = 0.0
+            logger.warning("Gripper actuator not found in MuJoCo model")
+
     # ============= Abstract Method Implementations =============
 
     def _apply_control(self) -> None:
@@ -103,6 +112,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
             else:
                 pos_targets = list(self._joint_position_targets)
             motion_enabled = self._motion_enabled
+            gripper_target = self._gripper_position_target
+            gripper_actuator_id = self._gripper_actuator_id
 
         if motion_enabled:
             if self._velocity_control:
@@ -128,6 +139,17 @@ class XArmSimBridge(MujocoSimBridgeBase):
                             self._data.ctrl[i] = pos_targets[i]
                     self._hold_positions = list(pos_targets)
 
+        # Apply gripper control (independent of motion_enabled)
+        if gripper_actuator_id >= 0:
+            # Convert XArm position (0-850 mm) to MuJoCo control (0-255)
+            # MuJoCo actuator uses ctrlrange="0 255", where 0=open, 255=closed
+            # XArm hardware uses 0-850 where 0=closed, 850=open (inverted!)
+            gripper_ctrl = ((850.0 - gripper_target) / 850.0) * 255.0
+            gripper_ctrl = max(0.0, min(255.0, gripper_ctrl))  # Clamp to valid range
+            with self._lock:
+                if gripper_actuator_id < self._model.nu:
+                    self._data.ctrl[gripper_actuator_id] = gripper_ctrl
+
     def _update_joint_state(self) -> None:
         """Update internal joint state from MuJoCo simulation."""
         with self._lock:
@@ -141,6 +163,14 @@ class XArmSimBridge(MujocoSimBridgeBase):
                     self._joint_efforts[i] = float(
                         self._data.qfrc_actuator[i] if i < len(self._data.qfrc_actuator) else 0.0
                     )
+
+            # Update gripper position from MuJoCo
+            if self._gripper_actuator_id >= 0 and self._gripper_actuator_id < self._model.nu:
+                # Read current gripper control value and convert back to XArm units (0-850)
+                gripper_ctrl = float(self._data.ctrl[self._gripper_actuator_id])
+                # Convert from MuJoCo control (0-255) to XArm position (0-850 mm)
+                # XArm hardware: 0=closed, 850=open (inverted from MuJoCo)
+                self._gripper_position_current = 850.0 - (gripper_ctrl / 255.0) * 850.0
 
     # ------------------------------------------------------------------ #
     # Properties (matching XArmAPI interface)
@@ -228,25 +258,16 @@ class XArmSimBridge(MujocoSimBridgeBase):
         if enable:
             self._connect_callback = None
 
-    def release_report_callback(self, enable: bool) -> None:
-        if enable:
-            self._report_callback = None
-
     def register_connect_changed_callback(self, callback: Callable[[bool, bool], None]) -> None:
         self._connect_callback = callback
         if self.connected:
             callback(True, True)
-
-    def register_report_callback(self, callback: Callable[[dict], None]) -> None:
-        self._report_callback = callback
 
     # ------------------------------------------------------------------ #
     # Connection management
     # ------------------------------------------------------------------ #
     def connect(self) -> None:
         logger.info("XArmSimBridge: connect()")
-        with self._lock:
-            self._last_update_time = time.time()
 
         if self._connect_callback:
             self._connect_callback(True, True)
@@ -254,19 +275,8 @@ class XArmSimBridge(MujocoSimBridgeBase):
         # Start base class simulation thread
         super().connect()
 
-        # Start report thread (XArm-specific)
-        if self._report_thread is None or not self._report_thread.is_alive():
-            self._report_thread = threading.Thread(
-                target=self._report_loop, name="XArmSimBridgeReport", daemon=True
-            )
-            self._report_thread.start()
-
     def disconnect(self) -> int:
         logger.info("XArmSimBridge: disconnect()")
-
-        # Stop report thread first
-        if self._report_thread and self._report_thread.is_alive():
-            self._report_thread.join(timeout=1.0)
 
         # Stop base class simulation thread
         super().disconnect()
@@ -333,43 +343,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             Tuple of (error_code, [serial_number, ...])
         """
         return (0, ["SIM-XARM-001"])
-
-    # ------------------------------------------------------------------ #
-    # Joint state helpers
-    # ------------------------------------------------------------------ #
-
-    def _notify_report(self) -> None:
-        callback = self._report_callback
-        if not callback:
-            return
-
-        with self._lock:
-            joints = list(self._joint_positions)
-            data = {
-                "state": self._state,
-                "mode": self._mode,
-                "error_code": 0,
-                "warn_code": 0,
-                "cmdnum": self._cmdnum,
-                "cartesian": self._estimate_cartesian_pose(joints),
-                "tcp_offset": [0.0] * 6,
-                "joints": joints,
-                "mtbrake": 0,
-                "mtable": int(self._motion_enabled),
-            }
-
-        try:
-            callback(data)
-        except Exception as exc:
-            logger.debug(f"XArmSimBridge report callback error: {exc}")
-
-    def _report_loop(self) -> None:
-        logger.info("XArmSimBridge: report loop started")
-        self._report_period = 1.0 / self._report_type
-        while not self._stop_event.is_set():
-            self._notify_report()
-            time.sleep(self._report_period)
-        logger.info("XArmSimBridge: report loop stopped")
 
     # ------------------------------------------------------------------ #
     # Joint / motion commands
@@ -543,7 +516,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         with self._lock:
             self._state = 4
             self._joint_velocities = [0.0] * self._num_joints
-        self._notify_report()
         return 0
 
     def clean_conf(self) -> int:
@@ -554,6 +526,53 @@ class XArmSimBridge(MujocoSimBridgeBase):
 
     def reload_dynamics(self) -> int:
         return 0
+
+    # ------------------------------------------------------------------ #
+    # Gripper control methods
+    # ------------------------------------------------------------------ #
+
+    def set_gripper_position(
+        self,
+        position: float,
+        wait: bool = False,
+        speed: float | None = None,
+        timeout: float | None = None,
+    ) -> int:
+        """Set gripper position.
+
+        Args:
+            position: Target position (0-850 mm, 0=closed, 850=open)
+            wait: Wait for completion (simulated in sim, returns immediately)
+            speed: Optional speed override (not used in simulation)
+            timeout: Optional timeout for wait (not used in simulation)
+
+        Returns:
+            Error code (0 = success)
+        """
+        if self._gripper_actuator_id < 0:
+            logger.warning("Gripper not available in simulation model")
+            return -1
+
+        # Clamp position to valid range
+        position = max(0.0, min(850.0, float(position)))
+
+        with self._lock:
+            self._gripper_position_target = position
+            self._cmdnum += 1
+
+        logger.debug(f"Gripper position set to {position:.1f} mm")
+        return 0
+
+    def get_gripper_position(self) -> tuple[int, float]:
+        """Get current gripper position.
+
+        Returns:
+            Tuple of (error_code, position). Position is 0-850 mm (0=closed, 850=open).
+            Error code 0 = success.
+        """
+        with self._lock:
+            position = self._gripper_position_current
+        return (0, position)
 
     # ------------------------------------------------------------------ #
     # Generic stubs for remaining SDK surface
@@ -571,6 +590,9 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """
         Provide best-effort implementations for the large surface of the
         hardware SDK that the simulation may not support yet.
+
+        This includes gripper methods like set_gripper_enable, set_gripper_mode,
+        set_gripper_speed, get_gripper_err_code, clean_gripper_error, etc.
         """
         if name.startswith("set_") or name.startswith("clean_") or name.endswith("_enable"):
             return self._simple_ok

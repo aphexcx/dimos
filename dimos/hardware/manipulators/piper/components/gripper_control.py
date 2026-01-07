@@ -18,7 +18,10 @@ Gripper Control Component for PiperDriver.
 Provides RPC methods for gripper control operations.
 """
 
+from typing import Any
+
 from dimos.core import rpc
+from dimos.hardware.manipulators.base.components import component_api
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
@@ -28,12 +31,23 @@ class GripperControlComponent:
     """
     Component providing gripper control RPC methods for PiperDriver.
 
-    This component assumes the parent class has:
-    - self.piper: C_PiperInterface_V2 instance
-    - self.config: PiperDriverConfig instance
+    This component follows the component-based architecture pattern.
+    Dependencies are injected via constructor or setter methods.
     """
 
-    @rpc
+    def __init__(self, sdk=None):
+        """Initialize the gripper control component.
+
+        Args:
+            sdk: SDK wrapper instance (can be set later via set_sdk)
+        """
+        self.sdk = sdk
+
+    def set_sdk(self, sdk):
+        """Inject SDK dependency."""
+        self.sdk = sdk
+
+    @component_api
     def set_gripper(
         self,
         gripper_angle: int,
@@ -54,7 +68,7 @@ class GripperControlComponent:
             Tuple of (success, message)
         """
         try:
-            result = self.piper.GripperCtrl(
+            result = self.sdk.native_sdk.GripperCtrl(
                 gripper_angle, gripper_effort, gripper_enable, gripper_state
             )
 
@@ -67,7 +81,7 @@ class GripperControlComponent:
             logger.error(f"set_gripper failed: {e}")
             return (False, str(e))
 
-    @rpc
+    @component_api
     def open_gripper(self, effort: int = 100) -> tuple[bool, str]:
         """
         Open gripper.
@@ -78,9 +92,10 @@ class GripperControlComponent:
         Returns:
             Tuple of (success, message)
         """
-        return self.set_gripper(gripper_angle=1000, gripper_effort=effort)
+        result: tuple[bool, str] = self.set_gripper(gripper_angle=1000, gripper_effort=effort)  # type: ignore[no-any-return]
+        return result
 
-    @rpc
+    @component_api
     def close_gripper(self, effort: int = 100) -> tuple[bool, str]:
         """
         Close gripper.
@@ -93,7 +108,50 @@ class GripperControlComponent:
         """
         return self.set_gripper(gripper_angle=0, gripper_effort=effort)
 
-    @rpc
+    @component_api
+    def set_gripper_position(
+        self, position: float, wait: bool = False, effort: int = 100
+    ) -> tuple[int, str]:
+        """
+        Set gripper position (for compatibility with manipulation_client).
+
+        Args:
+            position: Target position (0-1000, 0=closed, 1000=open)
+            wait: Wait for completion (ignored in current implementation)
+            effort: Gripper effort (0-1000)
+
+        Returns:
+            Tuple of (error_code, message). 0 = success, -1 = error
+        """
+        try:
+            result = self.sdk.native_sdk.GripperCtrl(int(position), effort, 0x01, 0x00)
+            if result:
+                return (0, f"Gripper position set to {position}")
+            else:
+                return (-1, "Failed to set gripper position")
+        except Exception as e:
+            logger.error(f"set_gripper_position failed: {e}")
+            return (-1, str(e))
+
+    @component_api
+    def get_gripper_position(self) -> tuple[int, float]:
+        """
+        Get current gripper position (for compatibility with manipulation_client).
+
+        Returns:
+            Tuple of (error_code, position). 0 = success, -1 = error
+            Position is 0-1000 (0=closed, 1000=open)
+        """
+        try:
+            # GetGripperState returns 0-100 percentage, convert to 0-1000
+            state = self.sdk.native_sdk.GetGripperState()
+            position = state * 10.0  # Convert percentage to 0-1000 range
+            return (0, position)
+        except Exception as e:
+            logger.error(f"get_gripper_position failed: {e}")
+            return (-1, 0.0)
+
+    @component_api
     def set_gripper_zero(self) -> tuple[bool, str]:
         """
         Set gripper zero position.

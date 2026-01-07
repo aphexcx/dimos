@@ -22,8 +22,14 @@ Provides RPC methods for controlling various grippers:
 - Robotiq gripper
 """
 
+from typing import TYPE_CHECKING, Any
+
 from dimos.core import rpc
+from dimos.hardware.manipulators.base.components import component_api
 from dimos.utils.logging_config import setup_logger
+
+if TYPE_CHECKING:
+    from xarm.wrapper import XArmAPI
 
 logger = setup_logger()
 
@@ -32,20 +38,31 @@ class GripperControlComponent:
     """
     Component providing gripper control RPC methods for XArmDriver.
 
-    This component assumes the parent class has:
-    - self.arm: XArmAPI instance
-    - self.config: XArmDriverConfig instance
+    This component follows the component-based architecture pattern.
+    Dependencies are injected via constructor or setter methods.
     """
+
+    def __init__(self, sdk=None):
+        """Initialize the gripper control component.
+
+        Args:
+            sdk: SDK wrapper instance (can be set later via set_sdk)
+        """
+        self.sdk = sdk
+
+    def set_sdk(self, sdk):
+        """Inject SDK dependency."""
+        self.sdk = sdk
 
     # =========================================================================
     # Standard xArm Gripper
     # =========================================================================
 
-    @rpc
+    @component_api
     def set_gripper_enable(self, enable: int) -> tuple[int, str]:
         """Enable/disable gripper."""
         try:
-            code = self.arm.set_gripper_enable(enable)
+            code = self.sdk.native_sdk.set_gripper_enable(enable)
             return (
                 code,
                 f"Gripper {'enabled' if enable else 'disabled'}"
@@ -55,25 +72,25 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def set_gripper_mode(self, mode: int) -> tuple[int, str]:
         """Set gripper mode (0=location mode, 1=speed mode, 2=current mode)."""
         try:
-            code = self.arm.set_gripper_mode(mode)
+            code = self.sdk.native_sdk.set_gripper_mode(mode)
             return (code, f"Gripper mode set to {mode}" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def set_gripper_speed(self, speed: float) -> tuple[int, str]:
         """Set gripper speed (r/min)."""
         try:
-            code = self.arm.set_gripper_speed(speed)
+            code = self.sdk.native_sdk.set_gripper_speed(speed)
             return (code, f"Gripper speed set to {speed}" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def set_gripper_position(
         self,
         position: float,
@@ -91,7 +108,9 @@ class GripperControlComponent:
             timeout: Optional timeout for wait
         """
         try:
-            code = self.arm.set_gripper_position(position, wait=wait, speed=speed, timeout=timeout)
+            code = self.sdk.native_sdk.set_gripper_position(
+                position, wait=wait, speed=speed, timeout=timeout
+            )
             return (
                 code,
                 f"Gripper position set to {position}" if code == 0 else f"Error code: {code}",
@@ -99,29 +118,29 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def get_gripper_position(self) -> tuple[int, float | None]:
         """Get current gripper position."""
         try:
-            code, position = self.arm.get_gripper_position()
+            code, position = self.sdk.native_sdk.get_gripper_position()
             return (code, position if code == 0 else None)
         except Exception:
             return (-1, None)
 
-    @rpc
+    @component_api
     def get_gripper_err_code(self) -> tuple[int, int | None]:
         """Get gripper error code."""
         try:
-            code, err = self.arm.get_gripper_err_code()
+            code, err = self.sdk.native_sdk.get_gripper_err_code()
             return (code, err if code == 0 else None)
         except Exception:
             return (-1, None)
 
-    @rpc
+    @component_api
     def clean_gripper_error(self) -> tuple[int, str]:
         """Clear gripper error."""
         try:
-            code = self.arm.clean_gripper_error()
+            code = self.sdk.native_sdk.clean_gripper_error()
             return (code, "Gripper error cleared" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
@@ -130,11 +149,11 @@ class GripperControlComponent:
     # Bio Gripper
     # =========================================================================
 
-    @rpc
+    @component_api
     def set_bio_gripper_enable(self, enable: int, wait: bool = True) -> tuple[int, str]:
         """Enable/disable bio gripper."""
         try:
-            code = self.arm.set_bio_gripper_enable(enable, wait=wait)
+            code = self.sdk.native_sdk.set_bio_gripper_enable(enable, wait=wait)
             return (
                 code,
                 f"Bio gripper {'enabled' if enable else 'disabled'}"
@@ -144,11 +163,11 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def set_bio_gripper_speed(self, speed: int) -> tuple[int, str]:
         """Set bio gripper speed (1-100)."""
         try:
-            code = self.arm.set_bio_gripper_speed(speed)
+            code = self.sdk.native_sdk.set_bio_gripper_speed(speed)
             return (
                 code,
                 f"Bio gripper speed set to {speed}" if code == 0 else f"Error code: {code}",
@@ -156,51 +175,51 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def open_bio_gripper(
         self, speed: int = 0, wait: bool = True, timeout: float = 5
     ) -> tuple[int, str]:
         """Open bio gripper."""
         try:
-            code = self.arm.open_bio_gripper(speed=speed, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.open_bio_gripper(speed=speed, wait=wait, timeout=timeout)
             return (code, "Bio gripper opened" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def close_bio_gripper(
         self, speed: int = 0, wait: bool = True, timeout: float = 5
     ) -> tuple[int, str]:
         """Close bio gripper."""
         try:
-            code = self.arm.close_bio_gripper(speed=speed, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.close_bio_gripper(speed=speed, wait=wait, timeout=timeout)
             return (code, "Bio gripper closed" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def get_bio_gripper_status(self) -> tuple[int, int | None]:
         """Get bio gripper status."""
         try:
-            code, status = self.arm.get_bio_gripper_status()
+            code, status = self.sdk.native_sdk.get_bio_gripper_status()
             return (code, status if code == 0 else None)
         except Exception:
             return (-1, None)
 
-    @rpc
+    @component_api
     def get_bio_gripper_error(self) -> tuple[int, int | None]:
         """Get bio gripper error code."""
         try:
-            code, error = self.arm.get_bio_gripper_error()
+            code, error = self.sdk.native_sdk.get_bio_gripper_error()
             return (code, error if code == 0 else None)
         except Exception:
             return (-1, None)
 
-    @rpc
+    @component_api
     def clean_bio_gripper_error(self) -> tuple[int, str]:
         """Clear bio gripper error."""
         try:
-            code = self.arm.clean_bio_gripper_error()
+            code = self.sdk.native_sdk.clean_bio_gripper_error()
             return (code, "Bio gripper error cleared" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
@@ -209,11 +228,11 @@ class GripperControlComponent:
     # Vacuum Gripper
     # =========================================================================
 
-    @rpc
+    @component_api
     def set_vacuum_gripper(self, on: int) -> tuple[int, str]:
         """Turn vacuum gripper on/off (0=off, 1=on)."""
         try:
-            code = self.arm.set_vacuum_gripper(on)
+            code = self.sdk.native_sdk.set_vacuum_gripper(on)
             return (
                 code,
                 f"Vacuum gripper {'on' if on else 'off'}" if code == 0 else f"Error code: {code}",
@@ -221,11 +240,11 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def get_vacuum_gripper(self) -> tuple[int, int | None]:
         """Get vacuum gripper state."""
         try:
-            code, state = self.arm.get_vacuum_gripper()
+            code, state = self.sdk.native_sdk.get_vacuum_gripper()
             return (code, state if code == 0 else None)
         except Exception:
             return (-1, None)
@@ -234,25 +253,25 @@ class GripperControlComponent:
     # Robotiq Gripper
     # =========================================================================
 
-    @rpc
+    @component_api
     def robotiq_reset(self) -> tuple[int, str]:
         """Reset Robotiq gripper."""
         try:
-            code = self.arm.robotiq_reset()
+            code = self.sdk.native_sdk.robotiq_reset()
             return (code, "Robotiq gripper reset" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def robotiq_set_activate(self, wait: bool = True, timeout: float = 3) -> tuple[int, str]:
         """Activate Robotiq gripper."""
         try:
-            code = self.arm.robotiq_set_activate(wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.robotiq_set_activate(wait=wait, timeout=timeout)
             return (code, "Robotiq gripper activated" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def robotiq_set_position(
         self,
         position: int,
@@ -272,7 +291,7 @@ class GripperControlComponent:
             timeout: Timeout for wait
         """
         try:
-            code = self.arm.robotiq_set_position(
+            code = self.sdk.native_sdk.robotiq_set_position(
                 position, speed=speed, force=force, wait=wait, timeout=timeout
             )
             return (
@@ -282,33 +301,37 @@ class GripperControlComponent:
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def robotiq_open(
         self, speed: int = 0xFF, force: int = 0xFF, wait: bool = True, timeout: float = 5
     ) -> tuple[int, str]:
         """Open Robotiq gripper."""
         try:
-            code = self.arm.robotiq_open(speed=speed, force=force, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.robotiq_open(
+                speed=speed, force=force, wait=wait, timeout=timeout
+            )
             return (code, "Robotiq gripper opened" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def robotiq_close(
         self, speed: int = 0xFF, force: int = 0xFF, wait: bool = True, timeout: float = 5
     ) -> tuple[int, str]:
         """Close Robotiq gripper."""
         try:
-            code = self.arm.robotiq_close(speed=speed, force=force, wait=wait, timeout=timeout)
+            code = self.sdk.native_sdk.robotiq_close(
+                speed=speed, force=force, wait=wait, timeout=timeout
+            )
             return (code, "Robotiq gripper closed" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
-    def robotiq_get_status(self) -> tuple[int, dict | None]:
+    @component_api
+    def robotiq_get_status(self) -> tuple[int, dict[str, Any] | None]:
         """Get Robotiq gripper status."""
         try:
-            ret = self.arm.robotiq_get_status()
+            ret = self.sdk.native_sdk.robotiq_get_status()
             if isinstance(ret, tuple) and len(ret) >= 2:
                 code = ret[0]
                 if code == 0:
@@ -335,29 +358,29 @@ class GripperControlComponent:
     # Lite6 Gripper
     # =========================================================================
 
-    @rpc
+    @component_api
     def open_lite6_gripper(self) -> tuple[int, str]:
         """Open Lite6 gripper."""
         try:
-            code = self.arm.open_lite6_gripper()
+            code = self.sdk.native_sdk.open_lite6_gripper()
             return (code, "Lite6 gripper opened" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def close_lite6_gripper(self) -> tuple[int, str]:
         """Close Lite6 gripper."""
         try:
-            code = self.arm.close_lite6_gripper()
+            code = self.sdk.native_sdk.close_lite6_gripper()
             return (code, "Lite6 gripper closed" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
 
-    @rpc
+    @component_api
     def stop_lite6_gripper(self) -> tuple[int, str]:
         """Stop Lite6 gripper."""
         try:
-            code = self.arm.stop_lite6_gripper()
+            code = self.sdk.native_sdk.stop_lite6_gripper()
             return (code, "Lite6 gripper stopped" if code == 0 else f"Error code: {code}")
         except Exception as e:
             return (-1, str(e))
