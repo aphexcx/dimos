@@ -141,13 +141,13 @@ xarm6_manipulation = autoconnect(
 
 xarm7_manipulation = autoconnect(
     xarm_driver(
-        ip="192.168.1.235",
+        ip="192.168.1.210",
         dof=7,
         has_gripper=True,  # Enable gripper control
         has_force_torque=False,
         control_rate=100,
         monitor_rate=10,
-        connection_type="sim",  # Use "hardware" for real robot
+        connection_type="hardware",  # Use "hardware" for real robot
     ),
     manipulation_module(
         robot_urdf_path=_get_xarm_urdf_path(),
