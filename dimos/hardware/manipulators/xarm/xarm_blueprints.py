@@ -179,6 +179,9 @@ xarm_trajectory = autoconnect(
         ("joint_position_command", JointCommand): LCMTransport(
             "/xarm/joint_position_command", JointCommand
         ),
+        ("joint_velocity_command", JointCommand): LCMTransport(
+            "/xarm/joint_velocity_command", JointCommand
+        ),
         # Trajectory input topic
         ("trajectory", JointTrajectory): LCMTransport("/trajectory", JointTrajectory),
     }

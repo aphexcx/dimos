@@ -39,3 +39,4 @@ actions = result["actions"]  # Shape: (15, 8) - 15 timesteps, 8 action dims
 
 print("Actions shape:", actions.shape)
 print("First action:", actions[0])
+print(result.keys())
