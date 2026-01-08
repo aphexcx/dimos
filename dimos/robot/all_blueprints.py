@@ -37,11 +37,12 @@ all_blueprints = {
     "unitree-g1-full": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:full_featured",
     "unitree-g1-detection": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:detection",
     # xArm manipulator blueprints
-    "xarm-servo": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm_servo",
-    "xarm5-servo": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm5_servo",
-    "xarm7-servo": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm7_servo",
-    "xarm-cartesian": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm_cartesian",
-    "xarm-trajectory": "dimos.hardware.manipulators.xarm.xarm_blueprints:xarm_trajectory",
+    "xarm-servo": "dimos.hardware.manipulators.xarm.blueprints:xarm_servo",
+    "xarm5-servo": "dimos.hardware.manipulators.xarm.blueprints:xarm5_servo",
+    "xarm7-servo": "dimos.hardware.manipulators.xarm.blueprints:xarm7_servo",
+    "xarm7-trajectory": "dimos.hardware.manipulators.xarm.blueprints:xarm7_trajectory",
+    "xarm-cartesian": "dimos.hardware.manipulators.xarm.blueprints:xarm_cartesian",
+    "xarm-trajectory": "dimos.hardware.manipulators.xarm.blueprints:xarm_trajectory",
     # Piper manipulator blueprints
     "piper-servo": "dimos.hardware.manipulators.piper.piper_blueprints:piper_servo",
     "piper-cartesian": "dimos.hardware.manipulators.piper.piper_blueprints:piper_cartesian",
@@ -84,7 +85,7 @@ all_modules = {
     "websocket_vis": "dimos.web.websocket_vis.websocket_vis_module",
     "web_input": "dimos.agents.cli.web",
     # xArm manipulator modules
-    "xarm_driver": "dimos.hardware.manipulators.xarm.xarm_driver",
+    "xarm_driver": "dimos.hardware.manipulators.xarm.arm",
     "cartesian_motion_controller": "dimos.manipulation.control.servo_control.cartesian_motion_controller",
     "joint_trajectory_controller": "dimos.manipulation.control.trajectory_controller.joint_trajectory_controller",
 }
