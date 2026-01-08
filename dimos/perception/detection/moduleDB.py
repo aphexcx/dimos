@@ -24,7 +24,7 @@ from lcm_msgs.foxglove_msgs import SceneUpdate  # type: ignore[import-not-found]
 from reactivex.observable import Observable
 
 from dimos.core import In, Out, rpc
-from dimos.models.vl.qwen import QwenVlModel  
+from dimos.models.vl.qwen import QwenVlModel
 from dimos.msgs.geometry_msgs import PoseStamped, Quaternion, Transform, Vector3
 from dimos.msgs.sensor_msgs import Image, PointCloud2
 from dimos.msgs.vision_msgs import Detection2DArray
@@ -325,33 +325,35 @@ class ObjectDBModule(Detection3DModule, TableStr):
     def get_all_detected_objects(self) -> list[dict]:
         """Get all detected objects with their details."""
         import time
-        
+
         results = []
         current_time = time.time()
-        
+
         for obj in self.objects.values():
             if not obj.name:
                 continue
-                
+
             try:
                 pose = obj.to_pose()
             except Exception as e:
                 logger.warning(f"Failed to get pose for {obj.track_id}: {e}")
                 continue
-            
-            results.append({
-                "track_id": obj.track_id,
-                "name": obj.name,
-                "yolo_label": obj.yolo_label,
-                "vlm_label": obj.vlm_label,
-                "detections": obj.detections,
-                "confidence": obj.confidence,
-                "pos_x": pose.position.x,
-                "pos_y": pose.position.y,
-                "pos_z": pose.position.z,
-                "last_seen": current_time - obj.ts,
-            })
-        
+
+            results.append(
+                {
+                    "track_id": obj.track_id,
+                    "name": obj.name,
+                    "yolo_label": obj.yolo_label,
+                    "vlm_label": obj.vlm_label,
+                    "detections": obj.detections,
+                    "confidence": obj.confidence,
+                    "pos_x": pose.position.x,
+                    "pos_y": pose.position.y,
+                    "pos_z": pose.position.z,
+                    "last_seen": current_time - obj.ts,
+                }
+            )
+
         results.sort(key=lambda x: x["last_seen"])
         return results
 
