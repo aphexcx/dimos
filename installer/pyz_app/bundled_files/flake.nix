@@ -6,7 +6,7 @@
     home-manager.url = "github:nix-community/home-manager/release-25.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     flake-utils.url  = "github:numtide/flake-utils";
-    dimos-flake.url  = "github:jeff-hykin/mystery_test_1/5aeee8b5f6e60239380eb912ac5ec1825edefb4f";
+    dimos-flake.url  = "github:dimensionalOS/dimos/main";
     dimos-flake.inputs.nixpkgs.follows     = "nixpkgs";
     dimos-flake.inputs.flake-utils.follows = "flake-utils";
     xome.url         = "github:jeff-hykin/xome";
@@ -86,11 +86,9 @@ except: exit(1)" 2>/dev/null; then
               if [ "''${DIMOS_ENABLED_FEATURES+dimos_features_are_defined}" = dimos_features_are_defined ]; then
                 # no features
                 if [ -z "$DIMOS_ENABLED_FEATURES" ]; then
-                  # FIXME: change before launch
-                  pip install 'dimos @ git+ssh://git@github.com/dimensionalOS/dimos.git'
+                  pip install dimos
                 else
-                  # FIXME: change before launch
-                  pip install 'dimos['"$DIMOS_ENABLED_FEATURES"'] @ git+ssh://git@github.com/dimensionalOS/dimos.git'
+                  pip install dimos'['"$DIMOS_ENABLED_FEATURES"']'
                 fi
               else
                 echo

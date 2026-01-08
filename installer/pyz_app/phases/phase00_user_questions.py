@@ -267,10 +267,6 @@ def phase0(cli_features: list[str] | None = None) -> tuple[dict[str, object], li
             ensure_flakes_enabled()
 
             install_command = f"pip install dimos{feat_str}"
-            # FIXME: change before release
-            dev_command = (
-                f"pip install 'dimos{feat_str} @ git+ssh://git@github.com/dimensionalOS/dimos.git'"
-            )
             if (
                 command_exists("direnv")
                 and envrc_path_obj.exists()
@@ -291,14 +287,12 @@ def phase0(cli_features: list[str] | None = None) -> tuple[dict[str, object], li
                 print(
                     f"Run {p.highlight(install_command)} after you run (and wait for) direnv allow to finish"
                 )
-                p.warning(f"because you're on dev run: {p.highlight(dev_command)}")
                 print("After that, DimOS should be ready to use")
             else:
                 dev_shell_command = p.highlight("nix develop '#.isolated'")
                 print(
                     f"Once you are ready:{git_commit_instruction}\n- run {dev_shell_command}\n- then run {p.highlight(install_command)}"
                 )
-                p.warning(f"because you're on dev run: {p.highlight(dev_command)}")
 
             raise SystemExit(0)
 
