@@ -189,6 +189,7 @@ class SpatialMemory(SkillModule):
         super().start()
         _ = self.tf
         import time
+
         time.sleep(1.0)
 
         # Subscribe to LCM streams
@@ -293,11 +294,11 @@ class SpatialMemory(SkillModule):
             self.last_record_time = current_time
             self.stored_frame_count += 1
 
-            #logger.info(
+            # logger.info(
             #    f"Stored frame at position ({current_pose.position.x:.2f}, {current_pose.position.y:.2f}, {current_pose.position.z:.2f}), "
             #    f"rotation ({euler.x:.2f}, {euler.y:.2f}, {euler.z:.2f}) "
             #    f"stored {self.stored_frame_count}/{self.frame_count} frames"
-            #)
+            # )
 
             # Periodically save visual memory to disk
             if self._visual_memory is not None and self.visual_memory_path is not None:

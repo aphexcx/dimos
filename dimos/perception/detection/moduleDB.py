@@ -270,43 +270,42 @@ class ObjectDBModule(Detection3DModule, TableStr):
 
     #     return ret[0] if ret else None
 
-
     @rpc
     def lookup(self, label: str, min_detections: int = 0.5) -> list[dict]:
         """Look up objects by label/name.
-        
+
         Returns lightweight dict instead of full Object3D to avoid RPC timeout.
-        
+
         Args:
             label: Name/class to search for
             min_detections: Minimum number of detections required (default: 1)
-            
+
         Returns:
             List of dicts with object info (track_id, name, position, etc.)
         """
         import time
-        
+
         # DEBUG: Log search details
         logger.error(f"Lookup called for '{label}'")
         logger.error(f"Total objects in DB: {len(self.objects)}")
-        
+
         # DEBUG: Log ALL object names in database
         all_names = [obj.name for obj in self.objects.values() if obj.name]
         logger.error(f"All object names in DB: {all_names}")
-        
+
         matching = []
-        
+
         for obj in self.objects.values():
             # DEBUG: Log each comparison
             if obj.name:
-                logger.debug(f"  Checking: '{obj.name}' vs '{label}' (detections: {obj.detections})")
-            
+                logger.debug(
+                    f"  Checking: '{obj.name}' vs '{label}' (detections: {obj.detections})"
+                )
+
             # Check name match
             if obj.name and label.lower() in obj.name.lower():
-                
                 # Check detection threshold
                 if obj.detections >= min_detections:
-                    
                     # Create lightweight dict (NO pointcloud, NO heavy data)
                     try:
                         pose = obj.to_pose()
@@ -326,7 +325,7 @@ class ObjectDBModule(Detection3DModule, TableStr):
                     except Exception as e:
                         logger.error(f"Failed to get pose for {obj.track_id}: {e}")
                         continue
-        
+
         logger.error(f"Returning {len(matching)} matches")
         return matching
 
