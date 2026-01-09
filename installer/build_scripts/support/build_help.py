@@ -99,6 +99,8 @@ def consolidate_and_validate_distributed_deps() -> None:
     print("- saving validated json")
     DEPENDENCY_OUT.write_text(json.dumps(aggregated, indent=2, sort_keys=True) + "\n")
 
+async def copy_app_sources() -> None:
+    """Copy the pyz_app sources into the build directory."""
     PYPROJECT_LINK.parent.mkdir(parents=True, exist_ok=True)
     try:
         if PYPROJECT_LINK.exists():
@@ -112,13 +114,7 @@ def consolidate_and_validate_distributed_deps() -> None:
     except Exception as exc:
         print(f"Failed to hardlink pyproject.toml: {exc}", file=sys.stderr)
 
-
-async def copy_app_sources() -> None:
-    """Copy the pyz_app sources into the build directory."""
-    if shutil.which("rsync"):
-        await _run_cmd_async("rsync", "-a", f"{APP_SRC}/", str(APP_DEST))
-    else:  # pragma: no cover - fallback path
-        await asyncio.to_thread(shutil.copytree, APP_SRC, APP_DEST, dirs_exist_ok=True)
+    await asyncio.to_thread(shutil.copytree, APP_SRC, APP_DEST, dirs_exist_ok=True)
 
 
 async def install_dependencies_into_pyz() -> None:
