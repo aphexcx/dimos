@@ -23,10 +23,13 @@ from xarm.wrapper import XArmAPI
 from dimos.core.transport import LCMTransport
 from dimos.msgs.sensor_msgs import Image, JointCommand, JointState
 from dimos.msgs.sensor_msgs.image_impls.AbstractImage import ImageFormat
+from dimos.msgs.sensor_msgs import JointCommand
+from dimos.protocol.rpc import LCMRPC
 
 ACTION_HORIZON = 15
 ACTION_CHUNK = None
 GRIPPER_CHUNK = None
+RPC_TIMEOUT_SEC = 5.0
 
 
 def get_camera_image(timeout: float = 5.0, topic: str = "/camera/color") -> np.ndarray:
@@ -51,7 +54,6 @@ def get_camera_image(timeout: float = 5.0, topic: str = "/camera/color") -> np.n
         raise TimeoutError(f"No image received on {topic} within {timeout} seconds.")
 
     return image_data["image"]
-
 
 def get_xarm_joint_positions(timeout: float = 5.0, topic: str = "/xarm/joint_states"):
     event = threading.Event()
@@ -97,7 +99,12 @@ def run_inference():
     Run inference loop until user interrupts
     """
     actions_from_chunk_completed = 0
-    joint_cmd_pub = LCMTransport("/xarm/joint_position_command", JointCommand)
+    rpc = LCMRPC()
+    rpc.start()
+    # joint_cmd_pub = LCMTransport("/xarm/joint_position_command", JointCommand)
+    rpc.call_sync("XArmDriver/set_velocity_scale", ([0.2], {}), rpc_timeout=RPC_TIMEOUT_SEC)
+    rpc.call_sync("XArmDriver/set_acceleration_scale", ([0.2], {}), rpc_timeout=RPC_TIMEOUT_SEC)
+
     while True:
         if actions_from_chunk_completed == 0 or actions_from_chunk_completed >= ACTION_HORIZON:
             actions_from_chunk_completed = 0
@@ -123,9 +130,11 @@ def run_inference():
         gripper_xarm = (1.0 - GRIPPER_CHUNK[actions_from_chunk_completed]) * 850
         actions_from_chunk_completed += 1
 
-        print(f"Setting joint positions: {action[:7]} and gripper position: {gripper_xarm}")
-        joint_positions_rad = np.deg2rad(action[:7]).tolist()
-        joint_cmd_pub.broadcast(None, JointCommand(joint_positions_rad))
+        print(f"Setting joint positions: {action[:-1]} and gripper position: {gripper_xarm}")
+        joint_positions_rad = np.deg2rad(action[:-1]).tolist()
+        # joint_cmd_pub.broadcast(None, JointCommand(positions=joint_positions_rad))
+        rpc.call_sync("XArmDriver/move_joint", ([joint_positions_rad], {}), rpc_timeout=RPC_TIMEOUT_SEC)
+
         # IT'S NOT SENDING COMMANDS TO THE ROBOT :((
 
         time.sleep(0.2)
@@ -144,10 +153,7 @@ if __name__ == "__main__":
     arm.motion_enable(enable=True)
     arm.set_mode(0)
     arm.set_state(state=0)
-    time.sleep(1)
     arm.move_gohome(wait=True)
-
-    observation = get_observation()
 
     run_inference()
 
