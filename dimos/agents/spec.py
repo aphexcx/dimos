@@ -146,6 +146,12 @@ class AgentConfig(ModuleConfig):
 
 AnyMessage = Union[SystemMessage, ToolMessage, AIMessage, HumanMessage]
 
+# Represents a single tool/function schema in OpenAI-compatible format.
+ToolSchema = dict[str, Any]
+
+# A list of tool schemas
+ToolSchemaList = list[ToolSchema]
+
 
 class AgentSpec(Service[AgentConfig], Module, ABC):
     default_config: type[AgentConfig] = AgentConfig
