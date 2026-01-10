@@ -148,8 +148,8 @@ class NavigationSkillContainer(SkillModule):
         )
         
         result = self._navigate_to(goal_pose)
-        
-        if result == "SUCCESS":
+
+        if result: 
             return f"Successfully navigated to '{obj.name}'"
         else:
             return f"Failed to reach '{obj.name}'"

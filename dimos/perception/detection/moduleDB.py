@@ -314,7 +314,7 @@ class ObjectDBModule(Detection3DModule, SkillModule, TableStr):
     def agent_encode(self) -> str:
         ret = []
         for obj in copy(self.objects).values():
-            if len(obj.detections) < 4:
+            if obj.detections < 4:
                 continue
             ret.append(str(obj.agent_encode()))
         if not ret:
