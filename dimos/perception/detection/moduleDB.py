@@ -16,6 +16,7 @@ from copy import copy
 import threading
 import time
 from typing import Any
+from dataclasses import dataclass
 
 from dimos_lcm.foxglove_msgs.ImageAnnotations import (
     ImageAnnotations,
@@ -31,9 +32,21 @@ from dimos.msgs.vision_msgs import Detection2DArray
 from dimos.perception.detection.module3D import Detection3DModule
 from dimos.perception.detection.type import ImageDetections3DPC, TableStr
 from dimos.perception.detection.type.detection3d import Detection3DPC
+from dimos.core.skill_module import SkillModule
+from dimos.protocol.skill.skill import skill
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
+
+@dataclass
+class DetectedObjectInfo:
+    """Lightweight detected object information for RPC."""
+    track_id: str
+    name: str
+    pose: PoseStamped
+    detections: int
+    confidence: float
+    last_seen: float
 
 
 # Represents an object in space, as collection of 3d detections over time
@@ -143,7 +156,7 @@ class Object3D(Detection3DPC):
         )
 
 
-class ObjectDBModule(Detection3DModule, TableStr):
+class ObjectDBModule(Detection3DModule, SkillModule, TableStr):
     cnt: int = 0
     objects: dict[str, Object3D]
     object_stream: Observable[Object3D] | None = None
@@ -206,41 +219,34 @@ class ObjectDBModule(Detection3DModule, TableStr):
         return self._vlm_model
 
     def _enrich_with_vlm(self, obj: Object3D) -> str:
-        """Generate rich description using VLM.
-
-        Args:
-            obj: Object3D with detection
-
-        Returns:
-            Rich description string
-        """
+        """Generate rich description using VLM."""
         if not self.enable_vlm_enrichment or self.vlm_model is None:
-            return obj.yolo_label  # Fall back to YOLO label
-
+            return obj.yolo_label or "unknown"  # Fallback for None
+        
         try:
             image = obj.get_image()
             if image is None:
-                logger.warning(f"No image for {obj.track_id}, using YOLO label")
-                return obj.yolo_label
-
-            prompt = f"Describe this {obj.yolo_label} in detail. Include color, appearance, and distinguishing features. Keep it concise (under 10 words)."
-
+                return obj.yolo_label or "unknown"
+            
+            if obj.yolo_label:
+                prompt = f"Describe this {obj.yolo_label} in detail. Include color, appearance, and distinguishing features. Keep it concise (under 10 words)."
+            else:
+                prompt = "Describe the main object in this image in detail. Include color, appearance, and distinguishing features. Keep it concise (under 10 words)."
+            
             description = self.vlm_model.query(image, prompt)
-
             rich_label = description.strip()
-
+            
             logger.info(f"VLM enrichment: '{obj.yolo_label}' → '{rich_label}'")
             return rich_label
-
+            
         except Exception as e:
-            logger.error(f"VLM enrichment failed for {obj.track_id}: {e}")
-            return obj.yolo_label  # Fall back to YOLO label
+            return obj.yolo_label or "unknown"
 
     def closest_object(self, detection: Detection3DPC) -> Object3D | None:
         matching_objects = [
             obj
             for obj in self.objects.values()
-            if obj.yolo_label == detection.name  # ← Use yolo_label for tracking
+            if obj.yolo_label == detection.name  
         ]
 
         if not matching_objects:
@@ -315,42 +321,6 @@ class ObjectDBModule(Detection3DModule, TableStr):
             return "No objects detected yet."
         return "\n".join(ret)
 
-    @rpc
-    def get_all_detected_objects(self) -> list[dict]:
-        """Get all detected objects with their details."""
-        import time
-
-        results = []
-        current_time = time.time()
-
-        for obj in self.objects.values():
-            if not obj.name:
-                continue
-
-            try:
-                pose = obj.to_pose()
-            except Exception as e:
-                logger.warning(f"Failed to get pose for {obj.track_id}: {e}")
-                continue
-
-            results.append(
-                {
-                    "track_id": obj.track_id,
-                    "name": obj.name,
-                    "yolo_label": obj.yolo_label,
-                    "vlm_label": obj.vlm_label,
-                    "detections": obj.detections,
-                    "confidence": obj.confidence,
-                    "pos_x": pose.position.x,
-                    "pos_y": pose.position.y,
-                    "pos_z": pose.position.z,
-                    "last_seen": current_time - obj.ts,
-                }
-            )
-
-        results.sort(key=lambda x: x["last_seen"])
-        return results
-
     # @rpc
     # def vlm_query(self, description: str) -> Object3D | None:
     #     imageDetections2D = super().ask_vlm(description)
@@ -382,53 +352,76 @@ class ObjectDBModule(Detection3DModule, TableStr):
 
     #     return ret[0] if ret else None
 
+    def _to_detection_info(self, obj: Object3D, current_time: float) -> DetectedObjectInfo | None:
+        """Convert Object3D to DetectedObjectInfo."""
+        try:
+            return DetectedObjectInfo(
+                track_id=obj.track_id,
+                name=obj.name,
+                pose=obj.to_pose(),
+                detections=obj.detections,
+                confidence=obj.confidence,
+                last_seen=current_time - obj.ts,
+            )
+        except Exception:
+            return None
+
     @rpc
-    def lookup(self, label: str, min_detections: int = 1) -> list[dict]:
-        """Look up objects by label/name.
-
-        Returns lightweight dict instead of full Object3D to avoid RPC timeout.
-
-        Args:
-            label: Name/class to search for
-            min_detections: Minimum number of detections required (default: 1)
-
-        Returns:
-            List of dicts with object info (track_id, name, position, etc.)
-        """
+    def lookup(self, label: str, min_detections: int = 1) -> list[DetectedObjectInfo]:
+        """Look up objects by label/name."""
         import time
-
-        logger.info(f"Looking up '{label}' (min_detections: {min_detections})")
-        logger.debug(f"Total objects in DB: {len(self.objects)}")
-
+        
+        current_time = time.time()
         matching = []
-
+        
+        label_lower = label.lower()
+        
         for obj in self.objects.values():
-            if not obj.name or label.lower() not in obj.name.lower():
+            if not obj.name:
                 continue
-
             if obj.detections < min_detections:
                 continue
+            
+            obj_name_lower = obj.name.lower()
 
-            try:
-                pose = obj.to_pose()
-                matching.append(
-                    {
-                        "track_id": obj.track_id,
-                        "name": obj.name,
-                        "detections": obj.detections,
-                        "confidence": obj.confidence,
-                        "pos_x": pose.position.x,
-                        "pos_y": pose.position.y,
-                        "pos_z": pose.position.z,
-                        "frame_id": pose.frame_id,
-                        "last_seen": time.time() - obj.ts,
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get pose for {obj.track_id}: {e}")
-
-        logger.info(f"Found {len(matching)} objects matching '{label}'")
+            is_match = (
+                label_lower in obj_name_lower  
+                or 
+                any(token in obj_name_lower for token in label_lower.split() if len(token) > 2)  
+            )
+            
+            if is_match:
+                info = self._to_detection_info(obj, current_time)
+                if info:
+                    matching.append(info)
+        
         return matching
+
+    @skill()
+    def list_detected_objects(self) -> str:
+        """List all objects detected by the vision system.
+        
+        Use this skill when the user asks questions about what the robot can see
+        or what objects are in the environment, such as:
+        - "What do you see?"
+        - "What have you detected?"
+        - "What objects are around?"
+        - "List everything you can see"
+        - "What's in the room?"
+        - "Are there any people nearby?"
+        """
+        if not self.objects:
+            return "I haven't detected any objects yet."
+        
+        lines = [f"I've detected {len(self.objects)} object(s):"]
+        for obj in list(self.objects.values())[:10]:
+            if obj.name:
+                lines.append(f"- {obj.name} ({obj.detections} detections)")
+        
+        if len(self.objects) > 10:
+            lines.append(f"... and {len(self.objects) - 10} more objects")
+        
+        return "\n".join(lines)
 
     @rpc
     def stop(self):  # type: ignore[no-untyped-def]

@@ -53,7 +53,6 @@ class NavigationSkillContainer(SkillModule):
         "WavefrontFrontierExplorer.explore",
         "WavefrontFrontierExplorer.is_exploration_active",
         "ObjectDBModule.lookup",
-        "ObjectDBModule.get_all_detected_objects",
     ]
 
     color_image: In[Image]
@@ -117,120 +116,45 @@ class NavigationSkillContainer(SkillModule):
 
     @skill()
     def navigate_to_detected_object(self, object_name: str) -> str:
-        """Navigate to an object or person that was detected by the vision system.
-
-        This uses ObjectDB to find objects that were previously seen and tracked.
-        Only use this for specific objects like "cup", "red box", "person", "chair".
-        The object must have been previously detected by the camera system.
-
+        """Navigate to an object detected by the vision system.
+        
+        Use this skill to navigate to specific objects that have been detected
+        by the robot's cameras, such as:
+        - "Navigate to person in white"
+        - "Go to red coffee mug"
+        - "Move to the wooden chair"
+        
         Args:
-            object_name: Name/class of the object to navigate to
-
+            object_name: Description or name of the object to navigate to
+            
         Returns:
-            Success or failure message
+            Status message indicating success or failure
         """
         if not self._skill_started:
             raise ValueError(f"{self} has not been started.")
-
-        # Get RPC handle
-        try:
-            lookup_rpc = self.get_rpc_calls("ObjectDBModule.lookup")
-        except Exception:
-            logger.error("ObjectDBModule not connected")
-            return "Error: ObjectDB module not connected. Make sure detection blueprint is loaded."
-
-        # Query ObjectDB
-        try:
-            objects = lookup_rpc(object_name)
-        except Exception:
-            return f"Error querying ObjectDB for '{object_name}'"
-
-        if not objects or len(objects) == 0:
-            return f"No detected object matching '{object_name}'. The object may not have been seen yet."
-
-        if len(objects) > 1:
-            logger.info(
-                f"Found {len(objects)} instances of '{object_name}', navigating to first one"
-            )
-
-        # Extract pose from dict (not Object3D anymore!)
-        try:
-            obj = objects[0]
-
-            # Create pose from dict fields
-            goal_pose = PoseStamped(
-                position=make_vector3(obj["pos_x"], obj["pos_y"], obj["pos_z"]),
-                orientation=Quaternion(),
-                frame_id=obj["frame_id"],
-            )
-
-            logger.info(
-                f"Navigating to detected '{obj['name']}' at ({obj['pos_x']:.2f}, {obj['pos_y']:.2f}, {obj['pos_z']:.2f})"
-            )
-            logger.info(
-                f"Object info: {obj['detections']} detections, confidence: {obj['confidence']:.2f}, last seen: {obj['last_seen']:.1f}s ago"
-            )
-
-        except (KeyError, TypeError):
-            return f"Error: Could not determine location of '{object_name}'"
-        except Exception:
-            return f"Error: Could not determine location of '{object_name}'"
-
-        result = self._navigate_to(goal_pose)
-
-        if result:
-            return f"Successfully navigated to '{object_name}'"
-        else:
-            return f"Failed to reach '{object_name}'. Navigation was cancelled or failed."
-
-    @skill()
-    def list_detected_objects(self) -> str:
-        """List all objects and people detected by the vision system.
-
-        Use this skill when the user asks questions about what the robot can see
-        or what objects are in the environment, such as:
-        - "What do you see?"
-        - "What have you detected?"
-        - "What objects are around?"
-        - "List everything you can see"
-        - "What's in the room?"
-        - "Are there any people nearby?"
-
-        This provides situational awareness of the robot's surroundings based on
-        what the camera system has detected and tracked.
-
-        Returns:
-            A description of all detected objects with their names and detection counts
-        """
-        if not self._skill_started:
-            raise ValueError(f"{self} has not been started.")
-
-        # Get objects
-        try:
-            get_all_rpc = self.get_rpc_calls("ObjectDBModule.get_all_detected_objects")
-        except Exception as e:
-            logger.error(f"ObjectDBModule not connected: {e}")
-            return "Error: ObjectDB module not connected. Detection system may not be running."
-
-        try:
-            objects = get_all_rpc()
-        except Exception as e:
-            logger.error(f"Failed to query ObjectDB: {e}")
-            return "Error: Cannot access detection system"
-
+        
+        lookup_rpc = self.get_rpc_calls("ObjectDBModule.lookup")
+        objects = lookup_rpc(object_name)
+        
         if not objects:
-            return "I haven't detected any objects yet."
+            return f"No objects found matching '{object_name}'"
+        
+        obj = objects[0]
+        
+        goal_pose = PoseStamped(
+            position=obj.pose.position,
+            orientation=Quaternion(),  
+            frame_id=obj.pose.frame_id
+        )
+        
+        result = self._navigate_to(goal_pose)
+        
+        if result == "SUCCESS":
+            return f"Successfully navigated to '{obj.name}'"
+        else:
+            return f"Failed to reach '{obj.name}'"
 
-        # Build list of detected objects
-        lines = [f"I've detected {len(objects)} object(s):"]
-        for obj in objects[:10]:  # Limit to 10 most recent
-            lines.append(f"- {obj['name']} ({obj['detections']} detections)")
-
-        if len(objects) > 10:
-            lines.append(f"... and {len(objects) - 10} more objects")
-
-        return "\n".join(lines)
-
+    #@skill()
     def navigate_with_text(self, query: str) -> str:
         """Navigate to a location by querying the existing semantic map..."""
         if not self._skill_started:
