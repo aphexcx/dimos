@@ -100,7 +100,7 @@ class XArmSimBridge(MujocoSimBridgeBase):
                 # Integrate velocity targets to position targets for MuJoCo control
                 dt = 1.0 / self._control_frequency
                 n_act = min(self._num_joints, self._model.nu)
-                min(self._num_joints, self._model.nq)
+                # min(self._num_joints, self._model.nq)
                 with self._lock:
                     for i in range(n_act):
                         # Integrate: position += velocity * dt
