@@ -48,7 +48,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         control_frequency: float,
         robot_description: str | None = None,
     ):
-        # Initialize base class (loads model, sets up threading, etc.)
         super().__init__(
             robot_name="xarm",
             num_joints=num_joints,
@@ -60,7 +59,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._report_type = 100 if report_type == "dev" else 5
         self._joint_state_rate = joint_state_rate if joint_state_rate > 0 else 0.01
 
-        # --- XArm-specific state variables --- #
         self._mode = 0
         self._state = 0
         self._cmdnum = 0
@@ -68,20 +66,15 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._warn_code = 0
         self._motion_enabled = True
 
-        # --- Additional threading for reports (XArm-specific) --- #
         self._report_thread: threading.Thread | None = None
         self._connect_callback: Callable[[bool, bool], None] | None = None
         self._report_callback: Callable[[dict], None] | None = None
 
-        # --- Velocity control support --- #
         self._joint_velocity_targets = [0.0] * self._num_joints
         self._velocity_control = False
-        # For velocity control: MuJoCo uses position-controlled actuators, so we integrate
-        # velocities to positions over time
         self._velocity_control_positions = [0.0] * self._num_joints
         self._hold_positions = [0.0] * self._num_joints
 
-        # Initialize velocity control positions from current state
         with self._lock:
             for i in range(min(self._num_joints, self._model.nq)):
                 current_pos = float(self._data.qpos[i])
@@ -92,8 +85,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         self._ft_raw_force = [0.0] * 6
         self._version_number = (1, 8, 103)
         self._core = self._CoreProxy(self)
-
-    # ============= Abstract Method Implementations =============
 
     def _apply_control(self) -> None:
         """Apply control commands to MuJoCo actuators."""
@@ -125,7 +116,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
                     self._hold_positions[:n_act] = pos_targets[:n_act]
 
     def _update_joint_state(self) -> None:
-        """Update internal joint state from MuJoCo simulation."""
         with self._lock:
             n_q = min(self._num_joints, self._model.nq)
             n_v = min(self._num_joints, self._model.nv)
@@ -223,9 +213,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             for i in range(len(dbg_msg)):
                 dbg_msg[i] = 0
 
-    # ------------------------------------------------------------------ #
-    # Lifecycle callbacks
-    # ------------------------------------------------------------------ #
     def release_connect_changed_callback(self, enable: bool) -> None:
         if enable:
             self._connect_callback = None
@@ -242,9 +229,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
     def register_report_callback(self, callback: Callable[[dict], None]) -> None:
         self._report_callback = callback
 
-    # ------------------------------------------------------------------ #
-    # Connection management
-    # ------------------------------------------------------------------ #
     def connect(self) -> None:
         logger.info("XArmSimBridge: connect()")
         with self._lock:
@@ -277,10 +261,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             self._connect_callback(False, True)
 
         return 0
-
-    # ------------------------------------------------------------------ #
-    # Core state helpers
-    # ------------------------------------------------------------------ #
 
     def get_err_warn_code(self, err_warn: list[int]) -> int:
         err_warn[0] = 0
@@ -336,10 +316,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         """
         return (0, ["SIM-XARM-001"])
 
-    # ------------------------------------------------------------------ #
-    # Joint state helpers
-    # ------------------------------------------------------------------ #
-
     def _notify_report(self) -> None:
         callback = self._report_callback
         if not callback:
@@ -372,10 +348,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             self._notify_report()
             time.sleep(self._report_period)
         logger.info("XArmSimBridge: report loop stopped")
-
-    # ------------------------------------------------------------------ #
-    # Joint / motion commands
-    # ------------------------------------------------------------------ #
 
     def get_servo_angle(self, is_radian: bool | None = None) -> tuple[int, Sequence[float]]:
         """Get current joint angles (matches XArmAPI.get_servo_angle).
@@ -489,9 +461,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
             self._cmdnum += 1
         return 0
 
-    # ------------------------------------------------------------------ #
-    # Cartesian helpers
-    # ------------------------------------------------------------------ #
     def _estimate_cartesian_pose(self, joints: Sequence[float]) -> list[float]:
         pose = [0.0] * 6
         for i in range(min(3, len(joints))):
@@ -526,9 +495,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
         home = [0.0] * self._num_joints
         return self.set_servo_angle_j(home, is_radian=is_radian)
 
-    # ------------------------------------------------------------------ #
-    # Force / torque sensor stubs
-    # ------------------------------------------------------------------ #
     def get_ft_sensor_data(self) -> tuple[int, Sequence[float]]:
         return (0, [0.0] * 6)
 
@@ -538,9 +504,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
     def get_ft_sensor_app_get(self) -> tuple[int, int]:
         return (0, 0)
 
-    # ------------------------------------------------------------------ #
-    # Emergency / resets
-    # ------------------------------------------------------------------ #
     def emergency_stop(self) -> int:
         with self._lock:
             self._state = 4
@@ -557,9 +520,6 @@ class XArmSimBridge(MujocoSimBridgeBase):
     def reload_dynamics(self) -> int:
         return 0
 
-    # ------------------------------------------------------------------ #
-    # Generic stubs for remaining SDK surface
-    # ------------------------------------------------------------------ #
     def _simple_ok(self, *args, **kwargs) -> int:
         return 0
 

@@ -45,8 +45,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
         self.dof = 7
         self._connected = False
 
-    # ============= Connection Management =============
-
     def connect(self, config: dict[str, Any]) -> bool:
         """Connect to the MuJoCo xArm simulation backend."""
         try:
@@ -98,8 +96,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
     def is_connected(self) -> bool:
         return bool(self._connected and self.native_sdk and self.native_sdk.connected)
 
-    # ============= Joint State Query =============
-
     def get_joint_positions(self) -> list[float]:
         code, angles = self.native_sdk.get_servo_angle()
         if code != 0:
@@ -119,8 +115,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
             if code == 0:
                 return list(torques[: self.dof])
         return [0.0] * self.dof
-
-    # ============= Joint Motion Control =============
 
     def set_joint_positions(
         self,
@@ -156,8 +150,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
             self.native_sdk.motion_enable(True)
         return _ok(code)
 
-    # ============= Servo Control =============
-
     def enable_servos(self) -> bool:
         code1 = self.native_sdk.motion_enable(True)
         code2 = self.native_sdk.set_state(0)
@@ -170,8 +162,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
 
     def are_servos_enabled(self) -> bool:
         return bool(self.native_sdk.mode == 1 and self.native_sdk.mode != 4)
-
-    # ============= System State =============
 
     def get_robot_state(self) -> dict[str, Any]:
         return {
@@ -200,8 +190,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
     def emergency_stop(self) -> bool:
         code = self.native_sdk.emergency_stop()
         return _ok(code)
-
-    # ============= Information =============
 
     def get_info(self) -> ManipulatorInfo:
         return ManipulatorInfo(
@@ -234,8 +222,6 @@ class XArmSimSDKWrapper(BaseManipulatorSDK):
     def get_acceleration_limits(self) -> list[float]:
         max_acc_rad = math.radians(1145.0)
         return [max_acc_rad] * self.dof
-
-    # ============= Optional Methods =============
 
     def get_cartesian_position(self) -> dict[str, float] | None:
         code, pose = self.native_sdk.get_position(is_radian=True)

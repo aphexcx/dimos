@@ -42,40 +42,22 @@ from dimos.msgs.sensor_msgs import (  # type: ignore[attr-defined]
     RobotState,
 )
 from dimos.msgs.trajectory_msgs import JointTrajectory
-from dimos.simulation.manipulators.mujoco_sim.xarmSimDriver import (
-    xarm_sim_driver as xarm_driver_blueprint,
-)
+from dimos.simulation.manipulators.mujoco_sim.xarmSimDriver import xarm_sim_driver
 
 
 # Create a blueprint wrapper for the component-based driver
-def xarm_driver(**config: Any) -> Any:
-    """Create a blueprint for XArmSimDriver.
-
-    Args:
-        **config: Configuration parameters passed to XArmSimDriver
-            - dof: Degrees of freedom - 5, 6, or 7 (default: 6)
-            - has_gripper: Whether gripper is attached (default: False)
-            - has_force_torque: Whether F/T sensor is attached (default: False)
-            - control_rate: Control loop + joint feedback rate in Hz (default: 100)
-            - monitor_rate: Robot state monitoring rate in Hz (default: 10)
-            - robot_description: robot_descriptions name for Menagerie model
-
-    Returns:
-        Blueprint configuration for XArmSimDriver
-    """
-    # Set defaults
-    config.setdefault("dof", 6)
+def xarm_sim_driver_blueprint(**config: Any) -> Any:
+    config.setdefault("dof", 7)
     config.setdefault("has_gripper", False)
     config.setdefault("has_force_torque", False)
     config.setdefault("control_rate", 100)
     config.setdefault("monitor_rate", 10)
 
-    # Return the xarm_driver blueprint with the config
-    return xarm_driver_blueprint(**config)
+    return xarm_sim_driver(**config)
 
 
 xarm7_trajectory_sim = autoconnect(
-    xarm_driver(
+    xarm_sim_driver(
         dof=7,  # XArm7
         has_gripper=False,
         has_force_torque=False,
@@ -90,10 +72,6 @@ xarm7_trajectory_sim = autoconnect(
     {
         ("joint_state", JointState): LCMTransport("/xarm/joint_states", JointState),
         ("robot_state", RobotState): LCMTransport("/xarm/robot_state", RobotState),
-        ("joint_position_command", JointCommand): LCMTransport(
-            "/xarm/joint_position_command", JointCommand
-        ),
-        ("trajectory", JointTrajectory): LCMTransport("/trajectory", JointTrajectory),
     }
 )
 
