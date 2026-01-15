@@ -162,7 +162,7 @@ class NavigationSkillContainer(SkillModule):
         goal_pose = PoseStamped(
             position=make_vector3(*robot_location.position),
             orientation=Quaternion.from_euler(Vector3(*robot_location.rotation)),
-            frame_id="map",
+            frame_id="world",
         )
 
         result = self._navigate_to(goal_pose)
@@ -393,7 +393,7 @@ class NavigationSkillContainer(SkillModule):
         return PoseStamped(
             position=make_vector3(pos_x, pos_y, 0),
             orientation=Quaternion.from_euler(make_vector3(0, 0, theta)),
-            frame_id="map",
+            frame_id="world",
         )
 
 
