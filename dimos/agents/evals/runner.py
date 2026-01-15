@@ -14,9 +14,9 @@
 
 """Eval runner module for evaluating generated evals against a model."""
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Any
 
@@ -455,10 +455,12 @@ class EvalRunner(Module):
                 tool_calls = msg.get("tool_calls", [])
                 for tc in tool_calls:
                     func = tc.get("function", {})
-                    expected_tool_calls.append({
-                        "name": func.get("name", ""),
-                        "arguments": json.loads(func.get("arguments", "{}")),
-                    })
+                    expected_tool_calls.append(
+                        {
+                            "name": func.get("name", ""),
+                            "arguments": json.loads(func.get("arguments", "{}")),
+                        }
+                    )
 
         if not user_query:
             return EvalResult(
@@ -491,10 +493,12 @@ class EvalRunner(Module):
         # Extract actual tool calls
         actual_tool_calls: list[dict[str, Any]] = []
         for tc in response.tool_calls:
-            actual_tool_calls.append({
-                "name": tc.get("name", ""),
-                "arguments": tc.get("args", {}),
-            })
+            actual_tool_calls.append(
+                {
+                    "name": tc.get("name", ""),
+                    "arguments": tc.get("args", {}),
+                }
+            )
 
         # Compare tool calls
         tool_call_results = self._compare_tool_calls(
@@ -513,7 +517,6 @@ class EvalRunner(Module):
             passed=passed,
             latency_ms=latency_ms,
         )
-
 
     def _compare_tool_calls(
         self,
@@ -551,26 +554,30 @@ class EvalRunner(Module):
                 else:  # EXACT
                     is_match = name_match and args_match
 
-                results.append(ToolCallResult(
-                    expected_name=exp_name,
-                    expected_args=exp_args,
-                    actual_name=act_name,
-                    actual_args=act_args,
-                    name_match=name_match,
-                    args_match=args_match,
-                    is_match=is_match,
-                ))
+                results.append(
+                    ToolCallResult(
+                        expected_name=exp_name,
+                        expected_args=exp_args,
+                        actual_name=act_name,
+                        actual_args=act_args,
+                        name_match=name_match,
+                        args_match=args_match,
+                        is_match=is_match,
+                    )
+                )
             else:
                 # Expected call not made
-                results.append(ToolCallResult(
-                    expected_name=exp_name,
-                    expected_args=exp_args,
-                    actual_name=None,
-                    actual_args=None,
-                    name_match=False,
-                    args_match=False,
-                    is_match=False,
-                ))
+                results.append(
+                    ToolCallResult(
+                        expected_name=exp_name,
+                        expected_args=exp_args,
+                        actual_name=None,
+                        actual_args=None,
+                        name_match=False,
+                        args_match=False,
+                        is_match=False,
+                    )
+                )
 
         return results
 
@@ -626,12 +633,12 @@ class EvalRunner(Module):
 They are equivalent if they would accomplish the same goal, even if the exact arguments differ slightly.
 
 Expected tool call:
-- Name: {expected.get('name')}
-- Arguments: {json.dumps(expected.get('arguments', {}))}
+- Name: {expected.get("name")}
+- Arguments: {json.dumps(expected.get("arguments", {}))}
 
 Actual tool call:
-- Name: {actual.get('name')}
-- Arguments: {json.dumps(actual.get('arguments', {}))}
+- Name: {actual.get("name")}
+- Arguments: {json.dumps(actual.get("arguments", {}))}
 
 Respond with ONLY "YES" if they are semantically equivalent, or "NO" if they are not."""
 
@@ -726,11 +733,11 @@ Respond with ONLY "YES" if they are semantically equivalent, or "NO" if they are
 eval_runner = EvalRunner.blueprint
 
 __all__ = [
-    "EvalRunner",
-    "eval_runner",
     "EvalResult",
     "EvalRunSummary",
-    "ToolCallResult",
-    "ModelSpec",
+    "EvalRunner",
     "ModelComparisonResult",
+    "ModelSpec",
+    "ToolCallResult",
+    "eval_runner",
 ]

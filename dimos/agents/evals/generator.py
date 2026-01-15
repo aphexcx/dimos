@@ -50,7 +50,7 @@ class EvalGenerator(Module):
 
         blueprint = get_blueprint_by_name('unitree-go2-agentic')
         gen = EvalGenerator(num_evals=100)
-        jsonl_path, json_path = gen.generate_from_blueprint(blueprint)
+        json_path = gen.generate_from_blueprint(blueprint)
         ```
     """
 
@@ -78,7 +78,7 @@ class EvalGenerator(Module):
         self,
         blueprint: ModuleBlueprintSet,
         output_prefix: str = "evals",
-    ) -> tuple[Path | None, Path | None]:
+    ) -> Path | None:
         """Generate evaluation dataset from a blueprint.
 
         Args:
@@ -86,13 +86,13 @@ class EvalGenerator(Module):
             output_prefix: Prefix for output filenames.
 
         Returns:
-            Tuple of (jsonl_path, json_path), either can be None based on config.
+            Path to the generated JSON file.
         """
         # Extract skills from the blueprint
         tools = extract_skills_from_blueprint(blueprint)
         if not tools:
             logger.warning("No skills found in blueprint")
-            return None, None
+            return None
 
         logger.info(f"Found {len(tools)} tools in blueprint")
 
@@ -121,25 +121,17 @@ class EvalGenerator(Module):
             all_evals.extend(multi_turn_evals)
             logger.info(f"Generated {len(multi_turn_evals)} multi-turn evals")
 
-        # Write output files
-        jsonl_path = None
-        json_path = None
-
+        # Write output file
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = self._write_json(all_evals, tools, output_prefix)
 
-        if self.config.output_format in ("jsonl", "both"):
-            jsonl_path = self._write_jsonl(all_evals, output_prefix)
-
-        if self.config.output_format in ("json", "both"):
-            json_path = self._write_json(all_evals, tools, output_prefix)
-
-        return jsonl_path, json_path
+        return json_path
 
     def generate_from_tools(
         self,
         tools: ToolSchemaList,
         output_prefix: str = "evals",
-    ) -> tuple[Path | None, Path | None]:
+    ) -> Path | None:
         """Generate evaluation dataset from a list of tool definitions.
 
         Args:
@@ -147,7 +139,7 @@ class EvalGenerator(Module):
             output_prefix: Prefix for output filenames.
 
         Returns:
-            Tuple of (jsonl_path, json_path), either can be None based on config.
+            Path to the generated JSON file.
         """
 
         logger.info(f"Generating evals for {len(tools)} tools")
@@ -175,19 +167,11 @@ class EvalGenerator(Module):
             )
             all_evals.extend(multi_turn_evals)
 
-        # Write output files
-        jsonl_path = None
-        json_path = None
-
+        # Write output file
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = self._write_json(all_evals, tools, output_prefix)
 
-        if self.config.output_format in ("jsonl", "both"):
-            jsonl_path = self._write_jsonl(all_evals, output_prefix)
-
-        if self.config.output_format in ("json", "both"):
-            json_path = self._write_json(all_evals, tools, output_prefix)
-
-        return jsonl_path, json_path
+        return json_path
 
     def _generate_single_turn_evals(
         self,
@@ -443,33 +427,6 @@ class EvalGenerator(Module):
                 )
 
         return {"messages": messages, "tools": tools}
-
-    def _write_jsonl(
-        self,
-        evals: list[dict[str, Any]],
-        output_prefix: str,
-    ) -> Path:
-        """Write evals to JSONL file for OpenAI fine-tuning.
-
-        Args:
-            evals: List of eval examples.
-            output_prefix: Filename prefix.
-
-        Returns:
-            Path to the written file.
-        """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{output_prefix}_{timestamp}.jsonl"
-        filepath = self.config.output_dir / filename
-
-        with open(filepath, "w") as f:
-            for eval_item in evals:
-                # JSONL format: just the messages, tools go in the fine-tuning config
-                jsonl_item = {"messages": eval_item.get("messages", [])}
-                f.write(json.dumps(jsonl_item) + "\n")
-
-        logger.info(f"Wrote {len(evals)} evals to {filepath}")
-        return filepath
 
     def _write_json(
         self,

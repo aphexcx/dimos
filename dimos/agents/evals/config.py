@@ -45,7 +45,7 @@ class EvalGeneratorConfig(ModuleConfig):
 
     # Output settings
     output_dir: Path = field(default_factory=lambda: Path("./evals"))
-    output_format: Literal["jsonl", "json", "both"] = "both"
+    output_format: Literal["json"] = "json"
 
     # LLM settings
     generation_prompt: str | None = None
