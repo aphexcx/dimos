@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from dimos.msgs.sensor_msgs.Image import Image, ImageFormat
-from dimos.protocol.pubsub.benchmark.type import TestCase
+from dimos.protocol.pubsub.benchmark.type import Case
 from dimos.protocol.pubsub.lcmpubsub import LCM, LCMPubSubBase, Topic as LCMTopic
 from dimos.protocol.pubsub.memory import Memory
 from dimos.protocol.pubsub.shmpubsub import PickleSharedMemory
@@ -28,7 +28,7 @@ def make_data(size: int) -> bytes:
     return bytes(i % 256 for i in range(size))
 
 
-testdata: list[TestCase[Any, Any]] = []
+testdata: list[Case[Any, Any]] = []
 
 
 @contextmanager
@@ -58,7 +58,7 @@ def lcm_msggen(size: int) -> tuple[LCMTopic, Image]:
 
 
 testdata.append(
-    TestCase(
+    Case(
         pubsub_context=lcm_pubsub_channel,
         msg_gen=lcm_msggen,
     )
@@ -81,7 +81,7 @@ def udp_raw_msggen(size: int) -> tuple[LCMTopic, bytes]:
 
 
 # testdata.append(
-#     TestCase(
+#     Case(
 #         pubsub_context=udp_raw_pubsub_channel,
 #         msg_gen=udp_raw_msggen,
 #     )
@@ -108,7 +108,7 @@ def memory_msggen(size: int) -> tuple[str, Any]:
 
 
 # testdata.append(
-#     TestCase(
+#     Case(
 #         pubsub_context=memory_pubsub_channel,
 #         msg_gen=memory_msggen,
 #     )
@@ -139,7 +139,7 @@ def shm_msggen(size: int) -> tuple[str, Any]:
 
 
 testdata.append(
-    TestCase(
+    Case(
         pubsub_context=shm_pubsub_channel,
         msg_gen=shm_msggen,
     )
@@ -164,7 +164,7 @@ try:
         return ("benchmark/redis", {"data": data, "size": size})
 
     testdata.append(
-        TestCase(
+        Case(
             pubsub_context=redis_pubsub_channel,
             msg_gen=redis_msggen,
         )
@@ -231,14 +231,14 @@ if ROS_AVAILABLE:
         return (topic, msg)
 
     testdata.append(
-        TestCase(
+        Case(
             pubsub_context=ros_best_effort_pubsub_channel,
             msg_gen=ros_msggen,
         )
     )
 
     testdata.append(
-        TestCase(
+        Case(
             pubsub_context=ros_reliable_pubsub_channel,
             msg_gen=ros_msggen,
         )
