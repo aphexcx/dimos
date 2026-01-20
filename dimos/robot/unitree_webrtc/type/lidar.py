@@ -22,6 +22,9 @@ import open3d as o3d  # type: ignore[import-untyped]
 
 from dimos.msgs.sensor_msgs import PointCloud2
 
+# Backwards compatibility alias for pickled data
+LidarMessage = PointCloud2
+
 
 class RawLidarPoints(TypedDict):
     points: np.ndarray  # type: ignore[type-arg]  # Shape (N, 3) array of 3D points [x, y, z]
