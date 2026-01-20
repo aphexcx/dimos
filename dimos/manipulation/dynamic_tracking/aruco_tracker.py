@@ -54,6 +54,7 @@ class ArucoTrackerConfig(ModuleConfig):
     )
     hardware_id: str = "arm"  # Hardware ID for ControlOrchestrator EE pose lookup
     robot_connected: bool = True  # Whether robot is connected (False = use dummy EE transform)
+    expected_marker_count: int = 4  # Expected number of ArUco markers (±1 tolerance)
 
 
 class ArucoTracker(Module[ArucoTrackerConfig]):
@@ -196,21 +197,12 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
             if d_roll > 3.14159:
                 d_roll = 2 * 3.14159 - d_roll
 
-            if d_roll > self.config.safety_max_rot_delta:
-                logger.warning(
-                    f"Safety check failed: roll delta {d_roll:.3f}rad exceeds limit {self.config.safety_max_rot_delta:.3f}rad"
-                )
-                return False
-            if d_pitch > self.config.safety_max_rot_delta:
-                logger.warning(
-                    f"Safety check failed: pitch delta {d_pitch:.3f}rad exceeds limit {self.config.safety_max_rot_delta:.3f}rad"
-                )
-                return False
-            if d_yaw > self.config.safety_max_rot_delta:
-                logger.warning(
-                    f"Safety check failed: yaw delta {d_yaw:.3f}rad exceeds limit {self.config.safety_max_rot_delta:.3f}rad"
-                )
-                return False
+            for name, delta in [("roll", d_roll), ("pitch", d_pitch), ("yaw", d_yaw)]:
+                if delta > self.config.safety_max_rot_delta:
+                    logger.warning(
+                        f"Safety check failed: {name} delta {delta:.3f}rad exceeds limit {self.config.safety_max_rot_delta:.3f}rad"
+                    )
+                    return False
 
         return True
 
@@ -242,7 +234,7 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
         logger.info(f"ArUco processing loop completed after {self._loop_count} iterations")
 
     def _process_image(self, image: Image) -> None:
-        """Process image to detect ArUco markers."""
+        """Process image to detect ArUco markers and average their poses."""
         if self._camera_matrix is None or self._dist_coeffs is None:
             return  # Skip if camera info not ready yet
 
@@ -257,59 +249,76 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
             display_image = image.data.copy()
             gray = image.data
 
-        # Detect ArUco markers
         corners, ids, _ = self._detector.detectMarkers(gray)
-
+        # If no markers detected, publish bare frame and return
         if ids is None or len(ids) == 0:
             logger.debug("No ArUco markers detected")
+            self._publish_annotated_image(display_image, image.format.name)
             return
 
-        if len(ids) > 1:
-            logger.error(f"Multiple ArUco markers detected ({len(ids)}), expected exactly one")
+        num_detected = len(ids)
+        expected = self.config.expected_marker_count
+        # Check if detected count is within ±1 of expected
+        if abs(num_detected - expected) > 1:
+            logger.error(
+                f"Detected {num_detected} ArUco markers, expected {expected} (±1 tolerance)"
+            )
+            self._publish_annotated_image(display_image, image.format.name)
             return
-
-        marker_id = int(ids[0][0])
-        marker_corners = corners[0]
-
-        # Estimate pose for the single marker
+        # Estimate pose for all detected markers
         rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-            [marker_corners], self.config.marker_size, self._camera_matrix, self._dist_coeffs
+            corners, self.config.marker_size, self._camera_matrix, self._dist_coeffs
         )
-        rvec = rvecs[0][0]
-        tvec = tvecs[0][0]
 
-        # Convert rotation vector to quaternion
-        rot_matrix, _ = cv2.Rodrigues(rvec)
-        quat = Rotation.from_matrix(rot_matrix).as_quat()  # [x, y, z, w]
+        # Collect all rotations and positions for averaging
+        rotations = []
+        positions = []
+        for i in range(num_detected):
+            rvec = rvecs[i][0]
+            tvec = tvecs[i][0]
+            rot_matrix, _ = cv2.Rodrigues(rvec)
+            rotations.append(Rotation.from_matrix(rot_matrix))
+            positions.append(tvec)
 
-        # Create and publish transforms (ArUco marker and EE)
-        transform = self._set_transforms(marker_id, tvec, quat, image.ts)
+        # Average position (simple mean)
+        avg_position = np.mean(positions, axis=0)
+
+        # Average rotation using scipy's mean (proper quaternion averaging)
+        avg_rotation = Rotation.concatenate(rotations).mean()
+        avg_quat = avg_rotation.as_quat()  # [x, y, z, w]
+
+        logger.debug(
+            f"Averaged {num_detected} markers: pos=({avg_position[0]:.3f}, {avg_position[1]:.3f}, {avg_position[2]:.3f})"
+        )
+
+        # Create and publish transforms using averaged pose
+        # Use "aruco_avg" as the frame ID for the averaged marker
+        transform = self._set_transforms("avg", avg_position, avg_quat, image.ts)
         if transform is None:
             logger.error("Failed to create transform")
+            self._publish_annotated_image(display_image, image.format.name)
             return
 
-        # Print TF tree
-        # print(self.tf.graph())
-
-        aruco_wrt_robot_base = self.tf.get("base_link", f"aruco_{marker_id}")
+        aruco_wrt_robot_base = self.tf.get("base_link", "aruco_avg")
         if aruco_wrt_robot_base is not None:
             aruco_rpy = aruco_wrt_robot_base.rotation.to_euler()
             logger.debug(
-                f"ArUco wrt base_link: x={aruco_wrt_robot_base.translation.x:.3f}, y={aruco_wrt_robot_base.translation.y:.3f}, z={aruco_wrt_robot_base.translation.z:.3f}, "
+                f"ArUco (avg) wrt base_link: x={aruco_wrt_robot_base.translation.x:.3f}, y={aruco_wrt_robot_base.translation.y:.3f}, z={aruco_wrt_robot_base.translation.z:.3f}, "
                 f"roll={aruco_rpy.x:.3f}, pitch={aruco_rpy.y:.3f}, yaw={aruco_rpy.z:.3f}"
             )
+        else:
+            logger.error("Failed to lookup aruco_avg wrt base_link")
 
         if aruco_wrt_robot_base is not None:
             self._move_to_aruco(aruco_wrt_robot_base)
 
-        # Draw markers on display image
+        # Draw markers on display image (show all detected markers)
         self._draw_markers(
             display_image,
-            [marker_corners],
-            np.array([[marker_id]]),
+            corners,
+            ids,
             rvecs,
             tvecs,
-            [transform],
             image.format.name,
         )
 
@@ -404,7 +413,7 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
             self._loop_count = self.config.max_loops
 
     def _set_transforms(
-        self, marker_id: int, tvec: np.ndarray, quat: np.ndarray, timestamp: float
+        self, marker_id: int | str, tvec: np.ndarray, quat: np.ndarray, timestamp: float
     ) -> Transform | None:
         # Create ArUco marker transform (camera_optical -> aruco_{marker_id})
         aruco_transform = Transform(
@@ -469,35 +478,8 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
 
         return aruco_transform
 
-    def _draw_markers(
-        self,
-        display_image: np.ndarray,
-        corners: list[np.ndarray],
-        ids: np.ndarray,
-        rvecs: np.ndarray,
-        tvecs: np.ndarray,
-        transforms: list[Transform],
-        image_format: str,
-    ) -> None:
-        # Draw all detected markers
-        cv2.aruco.drawDetectedMarkers(display_image, corners, ids)
-
-        # Draw axes and text for each marker
-        for i, (_marker_id, _transform) in enumerate(zip(ids.flatten(), transforms, strict=False)):
-            rvec = rvecs[i][0]
-            tvec = tvecs[i][0]
-
-            axis_length = self.config.marker_size * 0.5
-            cv2.drawFrameAxes(
-                display_image,
-                self._camera_matrix,
-                self._dist_coeffs,
-                rvec,
-                tvec,
-                axis_length,
-            )
-
-        # Publish annotated image (for Foxglove or other subscribers)
+    def _publish_annotated_image(self, display_image: np.ndarray, image_format: str) -> None:
+        """Publish the annotated image to subscribers and Rerun."""
         from dimos.msgs.sensor_msgs.Image import ImageFormat
 
         if image_format == "BGR":
@@ -513,6 +495,36 @@ class ArucoTracker(Module[ArucoTrackerConfig]):
         )
         self.annotated_image.publish(annotated_msg)
         rr.log("aruco/annotated", rr.Image(publish_image))
+
+    def _draw_markers(
+        self,
+        display_image: np.ndarray,
+        corners: list[np.ndarray],
+        ids: np.ndarray,
+        rvecs: np.ndarray,
+        tvecs: np.ndarray,
+        image_format: str,
+    ) -> None:
+        """Draw detected markers and axes on the image, then publish."""
+        # Draw all detected markers
+        cv2.aruco.drawDetectedMarkers(display_image, corners, ids)
+
+        # Draw axes for each marker
+        for i in range(len(ids)):
+            rvec = rvecs[i][0]
+            tvec = tvecs[i][0]
+
+            axis_length = self.config.marker_size * 0.5
+            cv2.drawFrameAxes(
+                display_image,
+                self._camera_matrix,
+                self._dist_coeffs,
+                rvec,
+                tvec,
+                axis_length,
+            )
+
+        self._publish_annotated_image(display_image, image_format)
 
 
 aruco_tracker = ArucoTracker.blueprint

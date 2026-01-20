@@ -51,13 +51,14 @@ aruco_tracker_realsense = (
             align_depth_to_color=False,
         ),
         aruco_tracker(
-            marker_size=0.027,  # 27mm markers (default)
+            marker_size=0.015,  # 15mm markers (default)
             aruco_dict=cv2.aruco.DICT_4X4_50,
             camera_frame_id="camera_color_optical_frame",
             rate=15,
             max_loops=10000,
             move_robot_to_aruco=False,
             robot_connected=False,  # No robot, use dummy EE transform
+            expected_marker_count=4,
         ),
     )
     .transports(
@@ -96,7 +97,7 @@ aruco_tracker_realsense_xarm6 = (
             align_depth_to_color=False,
         ),
         aruco_tracker(
-            marker_size=0.027,  # 27mm markers (default)
+            marker_size=0.015,  # 15mm markers (default)
             aruco_dict=cv2.aruco.DICT_4X4_50,
             camera_frame_id="camera_color_optical_frame",
             rate=15,
@@ -104,6 +105,7 @@ aruco_tracker_realsense_xarm6 = (
             move_robot_to_aruco=True,
             move_robot_to_aruco_rotation=True,  # Whether to follow ArUco rotation (False = fixed orientation)
             robot_connected=True,
+            expected_marker_count=4,
         ),
     )
     .transports(
