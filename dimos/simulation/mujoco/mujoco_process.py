@@ -31,7 +31,7 @@ import open3d as o3d  # type: ignore[import-untyped]
 from dimos.core.global_config import GlobalConfig
 from dimos.msgs.geometry_msgs import Vector3
 from dimos.robot.unitree_webrtc.type.lidar import LidarMessage
-from dimos.simulation.mujoco.constants import (
+from dimos.simulation.manipulators.constants import (
     DEPTH_CAMERA_FOV,
     LIDAR_FPS,
     LIDAR_RESOLUTION,

@@ -20,7 +20,7 @@ import math
 
 from dimos.hardware.manipulators.spec import JointLimits
 from dimos.simulation.engines.base import RobotSpec
-from dimos.simulation.engines.mujoco_engine import MujocoEngine
+from dimos.simulation.manipulators.mujoco_engine import MujocoEngine
 from dimos.simulation.registry import registry
 
 

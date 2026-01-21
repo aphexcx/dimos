@@ -30,3 +30,7 @@ LIDAR_RESOLUTION = 0.05
 # Simulation timing constants
 VIDEO_FPS = 20
 LIDAR_FPS = 2
+
+_MUJOCO_DIR = Path(__file__).resolve().parents[1] / "mujoco"
+LAUNCHER_PATH = _MUJOCO_DIR / "mujoco_process.py"
+ENGINE_LAUNCHER_PATH = _MUJOCO_DIR / "mujoco_engine_process.py"
