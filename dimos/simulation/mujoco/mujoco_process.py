@@ -31,7 +31,6 @@ import open3d as o3d  # type: ignore[import-untyped]
 from dimos.core.global_config import GlobalConfig
 from dimos.msgs.sensor_msgs import PointCloud2
 from dimos.simulation.mujoco.constants import (
-    DEPTH_CAMERA_FOV,
     LIDAR_FPS,
     LIDAR_RESOLUTION,
     VIDEO_FPS,
@@ -274,24 +273,30 @@ def _run_simulation(config: GlobalConfig, shm: ShmReader) -> None:
                 cameras_data = [
                     (
                         depth_front,
+                        lidar_camera_id,
                         data.cam_xpos[lidar_camera_id],
                         data.cam_xmat[lidar_camera_id].reshape(3, 3),
                     ),
                     (
                         depth_left,
+                        lidar_left_camera_id,
                         data.cam_xpos[lidar_left_camera_id],
                         data.cam_xmat[lidar_left_camera_id].reshape(3, 3),
                     ),
                     (
                         depth_right,
+                        lidar_right_camera_id,
                         data.cam_xpos[lidar_right_camera_id],
                         data.cam_xmat[lidar_right_camera_id].reshape(3, 3),
                     ),
                 ]
 
-                for depth_image, camera_pos, camera_mat in cameras_data:
+                for depth_image, cam_id, camera_pos, camera_mat in cameras_data:
                     points = depth_image_to_point_cloud(
-                        depth_image, camera_pos, camera_mat, fov_degrees=DEPTH_CAMERA_FOV
+                        depth_image,
+                        camera_pos,
+                        camera_mat,
+                        fov_degrees=float(model.cam_fovy[cam_id]),
                     )
                     if points.size > 0:
                         all_points.append(points)
