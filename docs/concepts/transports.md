@@ -4,7 +4,7 @@ Transports enable communication between [modules](modules.md) across process bou
 
 Each line in this graph is a Transport (can be different protocols), each node is a Module:
 
-![output](assets/go2_basic.svg)
+![go2_basic](assets/go2_basic.svg)
 
 Module transports are always unidirectional (they have a broadcaster and receiver side)
 
