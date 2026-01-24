@@ -73,8 +73,6 @@ text "pub/sub API" at P.s + (0, -0.2in)
 <!--Result:-->
 ![output](assets/abstraction_layers.svg)
 
-![output](assets/abstraction_layers.svg)
-
 We’ll go through these layers top-down.
 
 ---
@@ -202,9 +200,9 @@ Many of our message types provide `lcm_encode` / `lcm_decode` for compact, langu
 
 ---
 
-# PubSub transports (practice)
+# PubSub transports
 
-All our transport backends implement the `PubSub` interface:
+Even though transport can be anything (TCP connection, unix socket) for now all our transport backends implement the `PubSub` interface.
 
 * `publish(topic, message)`
 * `subscribe(topic, callback) -> unsubscribe`
@@ -218,7 +216,7 @@ print(inspect.getsource(PubSub.subscribe))
 ```
 
 <!--Result:-->
-```
+```python
     @abstractmethod
     def publish(self, topic: TopicT, message: MsgT) -> None:
         """Publish a message to a topic."""
@@ -237,6 +235,7 @@ Topic/message types are flexible: bytes, JSON, or our ROS-compatible [LCM](/docs
 ## LCM (UDP multicast)
 
 LCM is UDP multicast. It’s very fast on a robot LAN, but it’s **best-effort** (packets can drop).
+For local emission it autoconfigures system in a way in which it's more robust and faster then other more common protocols like ROS, DDS
 
 ```python
 from dimos.protocol.pubsub.lcmpubsub import LCM, Topic
@@ -392,11 +391,11 @@ python -m pytest -svm tool -k "not bytes" dimos/protocol/pubsub/benchmark/test_b
 
 # Available transports
 
-| Transport      | Use case                            | Cross-process | Network | Notes                          |
-|----------------|-------------------------------------|---------------|---------|--------------------------------|
-| `Memory`       | Testing only, single process        | No            | No      | Minimal reference impl         |
-| `SharedMemory` | Multi-process on same machine       | Yes           | No      | Highest throughput (IPC)       |
-| `LCM`          | Robot LAN broadcast (UDP multicast) | Yes           | Yes     | Best-effort; can drop packets  |
-| `Redis`        | Network pubsub via Redis server     | Yes           | Yes     | Central broker; adds hop       |
-| `ROS`          | ROS 2 topic communication           | Yes           | Yes     | Integrates with RViz/ROS tools |
-| `DDS`          | Cyclone DDS without ROS (WIP)       | Yes           | Yes     | WIP                            |
+| Transport      | Use case                            | Cross-process | Network | Notes                                |
+|----------------|-------------------------------------|---------------|---------|--------------------------------------|
+| `Memory`       | Testing only, single process        | No            | No      | Minimal reference impl               |
+| `SharedMemory` | Multi-process on same machine       | Yes           | No      | Highest throughput (IPC)             |
+| `LCM`          | Robot LAN broadcast (UDP multicast) | Yes           | Yes     | Best-effort; can drop packets on LAN |
+| `Redis`        | Network pubsub via Redis server     | Yes           | Yes     | Central broker; adds hop             |
+| `ROS`          | ROS 2 topic communication           | Yes           | Yes     | Integrates with RViz/ROS tools       |
+| `DDS`          | Cyclone DDS without ROS (WIP)       | Yes           | Yes     | WIP                                  |
