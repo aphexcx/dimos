@@ -18,7 +18,7 @@ import os
 
 import pytest
 
-from dimos.msgs.sensor_msgs import JointCommand, JointState
+from dimos.msgs.sensor_msgs import JointCommand, JointState, RobotState
 
 
 def _positions_within_tolerance(
@@ -33,6 +33,36 @@ def _positions_within_tolerance(
 
 @pytest.mark.skipif(bool(os.getenv("CI")), reason="LCM doesn't work in CI.")
 class TestSimulationModuleE2E:
+    def test_xarm7_joint_state_published(self, lcm_spy, start_blueprint) -> None:
+        joint_state_topic = "/xarm/joint_states#sensor_msgs.JointState"
+        lcm_spy.save_topic(joint_state_topic)
+
+        start_blueprint("simulation-xarm7")
+        lcm_spy.wait_for_saved_topic(joint_state_topic, timeout=15.0)
+
+        with lcm_spy._messages_lock:
+            raw_joint_state = lcm_spy.messages[joint_state_topic][0]
+
+        joint_state = JointState.lcm_decode(raw_joint_state)
+        assert len(joint_state.name) == 8
+        assert len(joint_state.position) == 8
+        assert "joint1" in joint_state.name
+        assert "joint7" in joint_state.name
+        assert "gripper" in joint_state.name
+
+    def test_xarm7_robot_state_published(self, lcm_spy, start_blueprint) -> None:
+        robot_state_topic = "/xarm/robot_state#sensor_msgs.RobotState"
+        lcm_spy.save_topic(robot_state_topic)
+
+        start_blueprint("simulation-xarm7")
+        lcm_spy.wait_for_saved_topic(robot_state_topic, timeout=15.0)
+
+        with lcm_spy._messages_lock:
+            raw_robot_state = lcm_spy.messages[robot_state_topic][0]
+
+        robot_state = RobotState.lcm_decode(raw_robot_state)
+        assert robot_state.mt_able in (0, 1)
+
     def test_xarm7_joint_command_updates_joint_state(self, lcm_spy, start_blueprint) -> None:
         joint_state_topic = "/xarm/joint_states#sensor_msgs.JointState"
         joint_command_topic = "/xarm/joint_position_command#sensor_msgs.JointCommand"

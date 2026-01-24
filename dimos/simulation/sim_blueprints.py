@@ -26,7 +26,7 @@ from dimos.utils.data import get_data
 xarm7_trajectory_sim = simulation(
     engine="mujoco",
     config_path=get_data("xarm7") / "scene.xml",
-    headless=False,
+    headless=True,
 ).transports(
     {
         ("joint_state", JointState): LCMTransport("/xarm/joint_states", JointState),
