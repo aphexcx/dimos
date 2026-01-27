@@ -135,6 +135,12 @@ wheels = [
 ]
 
 [[package]]
+name = "antlr4-python3-runtime"
+version = "4.9.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/38/7859ff46355f76f8d19459005ca000b6e7012f2f1ca597746cbcd1fbfe5e/antlr4-python3-runtime-4.9.3.tar.gz", hash = "sha256:f224469b4168294902bb1efa80a8bf7855f24c99aef99cbefc1bcd3cce77881b", size = 117034, upload-time = "2021-11-06T17:52:23.524Z" }
+
+[[package]]
 name = "anyio"
 version = "4.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1334,9 +1340,6 @@ complete = [
     { name = "pandas" },
     { name = "pyarrow" },
 ]
-distributed = [
-    { name = "distributed" },
-]
 
 [[package]]
 name = "debugpy"
@@ -1378,7 +1381,7 @@ wheels = [
 
 [[package]]
 name = "dimos"
-version = "0.0.8"
+version = "0.0.9"
 source = { editable = "." }
 dependencies = [
     { name = "asyncio" },
@@ -1431,6 +1434,7 @@ base = [
     { name = "fastapi" },
     { name = "ffmpeg-python" },
     { name = "filterpy" },
+    { name = "hydra-core" },
     { name = "langchain" },
     { name = "langchain-chroma" },
     { name = "langchain-core" },
@@ -1443,6 +1447,7 @@ base = [
     { name = "moondream" },
     { name = "mujoco" },
     { name = "ollama" },
+    { name = "omegaconf" },
     { name = "openai" },
     { name = "openai-whisper" },
     { name = "pillow" },
@@ -1472,6 +1477,7 @@ cuda = [
 dev = [
     { name = "coverage" },
     { name = "lxml-stubs" },
+    { name = "md-babel-py" },
     { name = "mypy" },
     { name = "pandas-stubs" },
     { name = "pre-commit" },
@@ -1501,26 +1507,6 @@ dev = [
     { name = "types-tqdm" },
     { name = "watchdog" },
 ]
-docker = [
-    { name = "dask", extra = ["distributed"] },
-    { name = "dimos-lcm" },
-    { name = "lcm" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "open3d" },
-    { name = "opencv-python-headless" },
-    { name = "plum-dispatch" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyturbojpeg" },
-    { name = "reactivex" },
-    { name = "rerun-sdk" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.16.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "sortedcontainers" },
-    { name = "structlog" },
-    { name = "typer" },
-]
 drone = [
     { name = "pymavlink" },
 ]
@@ -1543,6 +1529,7 @@ manipulation = [
 misc = [
     { name = "catkin-pkg" },
     { name = "cerebras-cloud-sdk" },
+    { name = "edgetam-dimos" },
     { name = "einops" },
     { name = "empy" },
     { name = "gdown" },
@@ -1567,8 +1554,10 @@ misc = [
 ]
 perception = [
     { name = "filterpy" },
+    { name = "hydra-core" },
     { name = "lap" },
     { name = "moondream" },
+    { name = "omegaconf" },
     { name = "pillow" },
     { name = "transformers", extra = ["torch"] },
     { name = "ultralytics" },
@@ -1584,6 +1573,7 @@ unitree = [
     { name = "fastapi" },
     { name = "ffmpeg-python" },
     { name = "filterpy" },
+    { name = "hydra-core" },
     { name = "langchain" },
     { name = "langchain-chroma" },
     { name = "langchain-core" },
@@ -1596,6 +1586,7 @@ unitree = [
     { name = "moondream" },
     { name = "mujoco" },
     { name = "ollama" },
+    { name = "omegaconf" },
     { name = "openai" },
     { name = "openai-whisper" },
     { name = "pillow" },
@@ -1635,11 +1626,10 @@ requires-dist = [
     { name = "ctransformers", extras = ["cuda"], marker = "extra == 'cuda'", specifier = "==0.2.27" },
     { name = "cupy-cuda12x", marker = "extra == 'cuda'", specifier = "==13.6.0" },
     { name = "dask", extras = ["complete"], specifier = "==2025.5.1" },
-    { name = "dask", extras = ["distributed"], marker = "extra == 'docker'", specifier = "==2025.5.1" },
     { name = "dimos", extras = ["agents", "web", "perception", "visualization", "sim"], marker = "extra == 'base'" },
     { name = "dimos", extras = ["base"], marker = "extra == 'unitree'" },
     { name = "dimos-lcm" },
-    { name = "dimos-lcm", marker = "extra == 'docker'" },
+    { name = "edgetam-dimos", marker = "extra == 'misc'" },
     { name = "einops", marker = "extra == 'misc'", specifier = "==0.8.1" },
     { name = "empy", marker = "extra == 'misc'", specifier = "==3.3.4" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115.6" },
@@ -1648,6 +1638,7 @@ requires-dist = [
     { name = "gdown", marker = "extra == 'misc'", specifier = "==5.2.0" },
     { name = "googlemaps", marker = "extra == 'misc'", specifier = ">=4.10.0" },
     { name = "h5py", marker = "extra == 'manipulation'", specifier = ">=3.7.0" },
+    { name = "hydra-core", marker = "extra == 'perception'", specifier = ">=1.3.0" },
     { name = "ipykernel", marker = "extra == 'misc'" },
     { name = "kaleido", marker = "extra == 'manipulation'", specifier = ">=0.2.1" },
     { name = "langchain", marker = "extra == 'agents'", specifier = ">=1,<2" },
@@ -1659,11 +1650,11 @@ requires-dist = [
     { name = "langchain-text-splitters", marker = "extra == 'agents'", specifier = ">=1,<2" },
     { name = "lap", marker = "extra == 'perception'", specifier = ">=0.5.12" },
     { name = "lark", marker = "extra == 'misc'" },
-    { name = "lcm", marker = "extra == 'docker'" },
     { name = "llvmlite", specifier = ">=0.42.0" },
     { name = "lxml-stubs", marker = "extra == 'dev'", specifier = ">=0.5.1,<1" },
     { name = "matplotlib", marker = "extra == 'manipulation'", specifier = ">=3.7.1" },
     { name = "mcp", marker = "extra == 'agents'", specifier = ">=1.0.0" },
+    { name = "md-babel-py", marker = "extra == 'dev'", specifier = "==1.1.1" },
     { name = "mmcv", marker = "extra == 'cuda'", specifier = ">=2.1.0" },
     { name = "mmengine", marker = "extra == 'cuda'", specifier = ">=0.10.3" },
     { name = "moondream", marker = "extra == 'perception'" },
@@ -1671,20 +1662,18 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.0" },
     { name = "numba", specifier = ">=0.60.0" },
     { name = "numpy", specifier = ">=1.26.4" },
-    { name = "numpy", marker = "extra == 'docker'", specifier = ">=1.26.4" },
     { name = "nvidia-nvimgcodec-cu12", extras = ["all"], marker = "extra == 'cuda'" },
     { name = "ollama", marker = "extra == 'agents'", specifier = ">=0.6.0" },
+    { name = "omegaconf", marker = "extra == 'perception'", specifier = ">=2.3.0" },
     { name = "onnx", marker = "extra == 'misc'" },
     { name = "onnxruntime", marker = "extra == 'cpu'" },
     { name = "onnxruntime-gpu", marker = "extra == 'cuda'", specifier = ">=1.17.1" },
     { name = "open-clip-torch", marker = "extra == 'misc'", specifier = "==3.2.0" },
     { name = "open3d" },
-    { name = "open3d", marker = "extra == 'docker'" },
     { name = "openai", marker = "extra == 'agents'" },
     { name = "openai-whisper", marker = "extra == 'agents'" },
     { name = "opencv-contrib-python", marker = "extra == 'misc'", specifier = "==4.10.0.84" },
     { name = "opencv-python" },
-    { name = "opencv-python-headless", marker = "extra == 'docker'" },
     { name = "pandas", marker = "extra == 'manipulation'", specifier = ">=1.5.2" },
     { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.3.2.250926,<3" },
     { name = "pillow", marker = "extra == 'perception'" },
@@ -1693,12 +1682,9 @@ requires-dist = [
     { name = "plotext", specifier = "==5.3.2" },
     { name = "plotly", marker = "extra == 'manipulation'", specifier = ">=5.9.0" },
     { name = "plum-dispatch", specifier = "==2.5.7" },
-    { name = "plum-dispatch", marker = "extra == 'docker'", specifier = "==2.5.7" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = "==4.2.0" },
     { name = "pydantic" },
-    { name = "pydantic", marker = "extra == 'docker'" },
     { name = "pydantic-settings", specifier = ">=2.11.0,<3" },
-    { name = "pydantic-settings", marker = "extra == 'docker'", specifier = ">=2.11.0,<3" },
     { name = "pygame", marker = "extra == 'sim'", specifier = ">=2.6.1" },
     { name = "pymavlink", marker = "extra == 'drone'" },
     { name = "pyquaternion", marker = "extra == 'manipulation'", specifier = ">=0.9.9" },
@@ -1712,27 +1698,21 @@ requires-dist = [
     { name = "python-fcl", marker = "extra == 'manipulation'", specifier = ">=0.7.0.4" },
     { name = "python-multipart", marker = "extra == 'misc'", specifier = "==0.0.20" },
     { name = "pyturbojpeg", specifier = "==1.8.2" },
-    { name = "pyturbojpeg", marker = "extra == 'docker'" },
     { name = "pyyaml", marker = "extra == 'manipulation'", specifier = ">=6.0" },
     { name = "reactivex" },
-    { name = "reactivex", marker = "extra == 'docker'" },
     { name = "requests-mock", marker = "extra == 'dev'", specifier = "==1.12.1" },
     { name = "rerun-sdk", specifier = ">=0.20.0" },
-    { name = "rerun-sdk", marker = "extra == 'docker'" },
     { name = "rerun-sdk", marker = "extra == 'visualization'", specifier = ">=0.20.0" },
     { name = "rtree", marker = "extra == 'manipulation'" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.14.3" },
     { name = "scikit-learn", marker = "extra == 'misc'" },
     { name = "scipy", specifier = ">=1.15.1" },
-    { name = "scipy", marker = "extra == 'docker'", specifier = ">=1.15.1" },
     { name = "sentence-transformers", marker = "extra == 'misc'" },
     { name = "sortedcontainers", specifier = "==2.4.0" },
-    { name = "sortedcontainers", marker = "extra == 'docker'" },
     { name = "sounddevice", marker = "extra == 'agents'" },
     { name = "soundfile", marker = "extra == 'web'" },
     { name = "sse-starlette", marker = "extra == 'web'", specifier = ">=2.2.1" },
     { name = "structlog", specifier = ">=25.5.0,<26" },
-    { name = "structlog", marker = "extra == 'docker'", specifier = ">=25.5.0,<26" },
     { name = "tensorboard", marker = "extra == 'misc'", specifier = "==2.20.0" },
     { name = "tensorzero", marker = "extra == 'misc'", specifier = "==2025.7.5" },
     { name = "terminaltexteffects", specifier = "==0.12.2" },
@@ -1746,7 +1726,6 @@ requires-dist = [
     { name = "trimesh", marker = "extra == 'manipulation'", specifier = ">=3.22.0" },
     { name = "typeguard", marker = "extra == 'misc'" },
     { name = "typer", specifier = ">=0.19.2,<1" },
-    { name = "typer", marker = "extra == 'docker'", specifier = ">=0.19.2,<1" },
     { name = "types-colorama", marker = "extra == 'dev'", specifier = ">=0.4.15.20250801,<1" },
     { name = "types-defusedxml", marker = "extra == 'dev'", specifier = ">=0.7.0.20250822,<1" },
     { name = "types-gevent", marker = "extra == 'dev'", specifier = ">=25.4.0.20250915,<26" },
@@ -1771,7 +1750,7 @@ requires-dist = [
     { name = "xformers", marker = "extra == 'cuda'", specifier = ">=0.0.20" },
     { name = "yapf", marker = "extra == 'misc'", specifier = "==0.40.2" },
 ]
-provides-extras = ["misc", "visualization", "agents", "web", "perception", "unitree", "manipulation", "cpu", "cuda", "dev", "sim", "drone", "docker", "base"]
+provides-extras = ["misc", "visualization", "agents", "web", "perception", "unitree", "manipulation", "cpu", "cuda", "dev", "sim", "drone", "base"]
 
 [[package]]
 name = "dimos-lcm"
@@ -1867,6 +1846,22 @@ sdist = { url = "https://files.pythonhosted.org/packages/9d/a4/e44218c2b394e31a6
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/0d/9feae160378a3553fa9a339b0e9c1a048e147a4127210e286ef18b730f03/durationpy-0.10-py3-none-any.whl", hash = "sha256:3b41e1b601234296b4fb368338fdcd3e13e0b4fb5b67345948f4f2bf9868b286", size = 3922, upload-time = "2025-05-17T13:52:36.463Z" },
 ]
+
+[[package]]
+name = "edgetam-dimos"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "hydra-core" },
+    { name = "iopath" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pillow" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7a/ea/bec55e18e19b6e43ed5f18bfcb699933ab82744fa8a52209ac6e94a6d6d8/edgetam_dimos-1.0.tar.gz", hash = "sha256:4fea5fd5a5aa17f9145dc4f35abc41de9426acaa0d59cae9b467cf26e657d4a7", size = 74935, upload-time = "2026-01-19T22:53:39.159Z" }
 
 [[package]]
 name = "einops"
@@ -2729,6 +2724,20 @@ wheels = [
 ]
 
 [[package]]
+name = "hydra-core"
+version = "1.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "antlr4-python3-runtime" },
+    { name = "omegaconf" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6d/8e/07e42bc434a847154083b315779b0a81d567154504624e181caf2c71cd98/hydra-core-1.3.2.tar.gz", hash = "sha256:8a878ed67216997c3e9d88a8e72e7b4767e81af37afb4ea3334b269a4390a824", size = 3263494, upload-time = "2023-02-23T18:33:43.03Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/50/e0edd38dcd63fb26a8547f13d28f7a008bc4a3fd4eb4ff030673f22ad41a/hydra_core-1.3.2-py3-none-any.whl", hash = "sha256:fa0238a9e31df3373b35b0bfb672c34cc92718d21f81311d8996a16de1141d8b", size = 154547, upload-time = "2023-02-23T18:33:40.801Z" },
+]
+
+[[package]]
 name = "identify"
 version = "2.6.15"
 source = { registry = "https://pypi.org/simple" }
@@ -2798,6 +2807,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
 ]
+
+[[package]]
+name = "iopath"
+version = "0.1.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "portalocker" },
+    { name = "tqdm" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/72/73/b3d451dfc523756cf177d3ebb0af76dc7751b341c60e2a21871be400ae29/iopath-0.1.10.tar.gz", hash = "sha256:3311c16a4d9137223e20f141655759933e1eda24f8bff166af834af3c645ef01", size = 42226, upload-time = "2022-07-09T19:00:50.866Z" }
 
 [[package]]
 name = "ipykernel"
@@ -4249,6 +4269,15 @@ wheels = [
 ]
 
 [[package]]
+name = "md-babel-py"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/b3/f814d429edf2848ba03079a3f6da443e6d45b984a7fc22766cb73939d289/md_babel_py-1.1.1.tar.gz", hash = "sha256:826fea96b7415eeaab7607ed5e8eb6d7723f22b9f1005af1b7da12f68766123d", size = 30547, upload-time = "2026-01-20T06:27:32.496Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/4a/dbe497b41432a98c7d4f043cf112410957553ce27e56bc366714695f53a9/md_babel_py-1.1.1-py3-none-any.whl", hash = "sha256:4df82011f123f13b6f9979226e69b0ce06209d94e4c029b60eeb2f54a709d2d0", size = 25836, upload-time = "2026-01-20T06:27:31.514Z" },
+]
+
+[[package]]
 name = "mdit-py-plugins"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5250,6 +5279,19 @@ wheels = [
 ]
 
 [[package]]
+name = "omegaconf"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "antlr4-python3-runtime" },
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/09/48/6388f1bb9da707110532cb70ec4d2822858ddfb44f1cdf1233c20a80ea4b/omegaconf-2.3.0.tar.gz", hash = "sha256:d5d4b6d29955cc50ad50c46dc269bcd92c6e00f5f90d23ab5fee7bfca4ba4cc7", size = 3298120, upload-time = "2022-12-08T20:59:22.753Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/94/1843518e420fa3ed6919835845df698c7e27e183cb997394e4a670973a65/omegaconf-2.3.0-py3-none-any.whl", hash = "sha256:7b4df175cdb08ba400f45cae3bdcae7ba8365db4d165fc65fd04b050ab63b46b", size = 79500, upload-time = "2022-12-08T20:59:19.686Z" },
+]
+
+[[package]]
 name = "onnx"
 version = "1.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5471,25 +5513,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/8b/90eb44a40476fa0e71e05a0283947cfd74a5d36121a11d926ad6f3193cc4/opencv_python-4.11.0.86-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6b02611523803495003bd87362db3e1d2a0454a6a63025dc6658a9830570aa0d", size = 62986597, upload-time = "2025-01-16T13:52:08.836Z" },
     { url = "https://files.pythonhosted.org/packages/fb/d7/1d5941a9dde095468b288d989ff6539dd69cd429dbf1b9e839013d21b6f0/opencv_python-4.11.0.86-cp37-abi3-win32.whl", hash = "sha256:810549cb2a4aedaa84ad9a1c92fbfdfc14090e2749cedf2c1589ad8359aa169b", size = 29384337, upload-time = "2025-01-16T13:52:13.549Z" },
     { url = "https://files.pythonhosted.org/packages/a4/7d/f1c30a92854540bf789e9cd5dde7ef49bbe63f855b85a2e6b3db8135c591/opencv_python-4.11.0.86-cp37-abi3-win_amd64.whl", hash = "sha256:085ad9b77c18853ea66283e98affefe2de8cc4c1f43eda4c100cf9b2721142ec", size = 39488044, upload-time = "2025-01-16T13:52:21.928Z" },
-]
-
-[[package]]
-name = "opencv-python-headless"
-version = "4.13.0.90"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/76/38c4cbb5ccfce7aaf36fd9be9fc74a15c85a48ef90bfaca2049b486e10c5/opencv_python_headless-4.13.0.90-cp37-abi3-macosx_13_0_arm64.whl", hash = "sha256:12a28674f215542c9bf93338de1b5bffd76996d32da9acb9e739fdb9c8bbd738", size = 46020414, upload-time = "2026-01-18T09:07:10.801Z" },
-    { url = "https://files.pythonhosted.org/packages/93/c5/4b40daa5003b45aa8397f160324a091ed323733e2446dc0bdf3655e77b84/opencv_python_headless-4.13.0.90-cp37-abi3-macosx_14_0_x86_64.whl", hash = "sha256:32255203040dc98803be96362e13f9e4bce20146898222d2e5c242f80de50da5", size = 32568519, upload-time = "2026-01-18T09:07:52.368Z" },
-    { url = "https://files.pythonhosted.org/packages/da/65/920e64a7f03cf5917cd2c6a3046293843c1a16ad89f0ed0f1c683979c9de/opencv_python_headless-4.13.0.90-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:e13790342591557050157713af17a7435ac1b50c65282715093c9297fa045d8f", size = 35191272, upload-time = "2026-01-18T09:08:49.235Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/13/af150685be342dc09bfb0824e2a280020ccf1c7fc64e15a31d9209016aa9/opencv_python_headless-4.13.0.90-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:dbc1f4625e5af3a80ebdbd84380227c0f445228588f2521b11af47710caca1ba", size = 57683677, upload-time = "2026-01-18T09:10:23.588Z" },
-    { url = "https://files.pythonhosted.org/packages/cd/47/baab2a3b6d8da8c52e73d00207d1ed3155601c2c332ea855455b3fbc8ff4/opencv_python_headless-4.13.0.90-cp37-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:eba38bc255d0b7d1969c5bcc90a060ca2b61a3403b613872c750bfa5dfe9e03b", size = 36590019, upload-time = "2026-01-18T09:10:49.053Z" },
-    { url = "https://files.pythonhosted.org/packages/81/a1/facfe2801a861b424c4221d66e1281cf19735c00e07f063a337a208c11b5/opencv_python_headless-4.13.0.90-cp37-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:f46b17ea0aa7e4124ca6ad71143f89233ae9557f61d2326bcdb34329a1ddf9bd", size = 62535926, upload-time = "2026-01-18T09:12:47.229Z" },
-    { url = "https://files.pythonhosted.org/packages/06/d2/5e9ee7512306c1caa518be929d1f44bb1c189f342f538f73bea6fb94919f/opencv_python_headless-4.13.0.90-cp37-abi3-win32.whl", hash = "sha256:96060fc57a1abb1144b0b8129e2ff3bfcdd0ccd8e8bd05bd85256ff4ed587d3b", size = 30811665, upload-time = "2026-01-18T09:13:44.517Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/09/0a4d832448dccd03b2b1bdee70b9fc2e02c147cc7e06975e9cd729569d90/opencv_python_headless-4.13.0.90-cp37-abi3-win_amd64.whl", hash = "sha256:0e0c8c9f620802fddc4fa7f471a1d263c7b0dca16cd9e7e2f996bb8bd2128c0c", size = 40070035, upload-time = "2026-01-18T09:15:14.652Z" },
 ]
 
 [[package]]
@@ -6079,6 +6102,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/11/b2/3fede95feee441be64b4bcb32444679a8fbb7a453a10251583053f6efe52/polars_runtime_32-1.36.1-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:d9d077bb9df711bc635a86540df48242bb91975b353e53ef261c6fae6cb0948f", size = 40688448, upload-time = "2025-12-10T01:14:05.131Z" },
     { url = "https://files.pythonhosted.org/packages/05/0f/e629713a72999939b7b4bfdbf030a32794db588b04fdf3dc977dd8ea6c53/polars_runtime_32-1.36.1-cp39-abi3-win_amd64.whl", hash = "sha256:cc17101f28c9a169ff8b5b8d4977a3683cd403621841623825525f440b564cf0", size = 44464898, upload-time = "2025-12-10T01:14:08.296Z" },
     { url = "https://files.pythonhosted.org/packages/d1/d8/a12e6aa14f63784cead437083319ec7cece0d5bb9a5bfe7678cc6578b52a/polars_runtime_32-1.36.1-cp39-abi3-win_arm64.whl", hash = "sha256:809e73857be71250141225ddd5d2b30c97e6340aeaa0d445f930e01bef6888dc", size = 39798896, upload-time = "2025-12-10T01:14:11.568Z" },
+]
+
+[[package]]
+name = "portalocker"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5e/77/65b857a69ed876e1951e88aaba60f5ce6120c33703f7cb61a3c894b8c1b6/portalocker-3.2.0.tar.gz", hash = "sha256:1f3002956a54a8c3730586c5c77bf18fae4149e07eaf1c29fc3faf4d5a3f89ac", size = 95644, upload-time = "2025-06-14T13:20:40.03Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/a6/38c8e2f318bf67d338f4d629e93b0b4b9af331f455f0390ea8ce4a099b26/portalocker-3.2.0-py3-none-any.whl", hash = "sha256:3cdc5f565312224bc570c49337bd21428bba0ef363bbcf58b9ef4a9f11779968", size = 22424, upload-time = "2025-06-14T13:20:38.083Z" },
 ]
 
 [[package]]
