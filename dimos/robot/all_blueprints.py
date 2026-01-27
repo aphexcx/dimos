@@ -30,6 +30,7 @@ all_blueprints = {
     "demo-google-maps-skill": "dimos.agents.skills.demo_google_maps_skill:demo_google_maps_skill",
     "demo-gps-nav": "dimos.agents.skills.demo_gps_nav:demo_gps_nav",
     "demo-object-scene-registration": "dimos.perception.demo_object_scene_registration:demo_object_scene_registration",
+    "demo-perception-grasping": "dimos.perception.demo_perception_grasping:demo_perception_grasping",
     "demo-osm": "dimos.mapping.osm.demo_osm:demo_osm",
     "demo-skill": "dimos.agents.skills.demo_skill:demo_skill",
     "unitree-g1": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:unitree_g1",
