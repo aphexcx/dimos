@@ -469,7 +469,7 @@ class Module(ModuleBase[ModuleConfigT]):
 ModuleT = TypeVar("ModuleT", bound="Module")
 
 
-def is_module_type(value: Any):
+def is_module_type(value: Any) -> bool:
     try:
         return inspect.isclass(value) and issubclass(value, Module)
     except Exception:
