@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 
 logger = setup_logger()
 
-_participant: DomainParticipant | None = None
-_participant_lock = threading.Lock()
+_participants: dict[int, DomainParticipant] = {}
+_participants_lock = threading.Lock()
 
 
 @dataclass
@@ -48,28 +48,24 @@ class DDSService(Service[DDSConfig]):
 
     def start(self) -> None:
         """Start the DDS service."""
-        global _participant
-        with _participant_lock:
-            if _participant is None:
-                _participant = DomainParticipant(self.config.domain_id)
-                logger.info(f"DDS service started with Cyclone DDS domain {self.config.domain_id}")
+        domain_id = self.config.domain_id
+        with _participants_lock:
+            if domain_id not in _participants:
+                _participants[domain_id] = DomainParticipant(domain_id)
+                logger.info(f"DDS service started with Cyclone DDS domain {domain_id}")
         super().start()
 
     def stop(self) -> None:
         """Stop the DDS service."""
-        global _participant
-        with _participant_lock:
-            if _participant is not None:
-                _participant = None
-                logger.info("DDS service stopped")
         super().stop()
 
     @property
     def participant(self) -> DomainParticipant:
-        """Get the DomainParticipant instance."""
-        if _participant is None:
-            raise RuntimeError("DomainParticipant not initialized")
-        return _participant
+        """Get the DomainParticipant instance for this service's domain."""
+        domain_id = self.config.domain_id
+        if domain_id not in _participants:
+            raise RuntimeError(f"DomainParticipant not initialized for domain {domain_id}")
+        return _participants[domain_id]
 
 
 __all__ = [
