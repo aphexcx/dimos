@@ -24,8 +24,6 @@ if TYPE_CHECKING:
 
     from dimos.msgs.geometry_msgs import PoseStamped
 
-    from dimos.msgs.geometry_msgs import PoseStamped
-
 
 @dataclass
 class RobotModelConfig:
