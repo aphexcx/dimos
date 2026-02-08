@@ -1,55 +1,34 @@
-## Pull Request Summary
+## Problem
+<!-- What feature are you adding, or what is broken/missing/sub-optimal? -->
+<!-- Context, symptoms, motivation. Link the issue. -->
 
-### Short Description
-
-<!-- One–two sentences describing what this PR does and why -->
-
----
-
-### Key Feature Requested
-
-<!-- What feature, capability, or behavior is being added or changed? -->
+Issue: #
 
 ---
 
-### Feature Scope
-
-<!-- Describe the scope of this change. What is included and explicitly out of scope? -->
-
----
-
-### Stack / Category
-
-<!-- Check all that apply -->
-
-* [ ] Navigation
-* [ ] Perception
-* [ ] Manipulation
-* [ ] Other (please specify):
+## Solution
+<!-- What you changed and why this approach -->
+<!-- Key design decisions / tradeoffs -->
+<!-- Keep it high-signal; deep planning belongs in the issue. -->
 
 ---
 
-### Breaking Changes
+## Breaking Changes
+<!-- Write "None" if not applicable -->
 
-* [ ] Yes
-* [ ] No
+None
 
-**If yes, describe the breaking change and migration path:**
-
-<!-- Explain what breaks and how users should adapt -->
-
----
-
-### Effort Estimate
-
-<!-- Rough effort level -->
-
-* [ ] Small (≤1 day)
-* [ ] Medium (2–5 days)
-* [ ] Large (1+ week)
+<!-- If applicable:
+- What breaks
+- Who is affected
+- Migration steps
+-->
 
 ---
 
-### Additional Notes (Optional)
+## How to Test
+<!-- MUST be reproducible. If this section is weak, reviewers can't approve confidently. -->
 
-<!-- Context, tradeoffs, follow-ups, or known limitations -->
+### One-command PR verification (required)
+```bash
+./scripts/test_pr.sh
