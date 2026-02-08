@@ -5,14 +5,17 @@ import signal
 import time
 from typing import TYPE_CHECKING, cast
 
+from rich.console import Console
+
 from dimos.core.core import rpc
 from dimos.utils.logging_config import setup_logger
 import lazy_loader as lazy
 
 if TYPE_CHECKING:
     # Avoid runtime import to prevent circular import; ruff's TC001 would otherwise move it.
-    from dask.distributed import Client as DimosCluster, LocalCluster
+    from dask.distributed import LocalCluster
 
+    from dimos.core._dask_exports import DimosCluster
     from dimos.core.module import Module
     from dimos.core.rpc_client import ModuleProxy
 
@@ -22,6 +25,7 @@ __getattr__, __dir__, __all__ = lazy.attach(
     __name__,
     submodules=["colors"],
     submod_attrs={
+        "blueprints": ["autoconnect", "Blueprint"],
         "_dask_exports": ["DimosCluster"],
         "_protocol_exports": ["LCMRPC", "RPCSpec", "LCMTF", "TF", "PubSubTF", "TFConfig", "TFSpec"],
         "module": ["Module", "ModuleBase", "ModuleConfig", "ModuleConfigT"],
@@ -106,7 +110,6 @@ def patchdask(dask_client: DimosCluster, local_cluster: LocalCluster) -> DimosCl
     def check_worker_memory() -> None:
         """Check memory usage of all workers."""
         info = dask_client.scheduler_info()
-        from rich.console import Console
 
         console = Console()
         total_workers = len(info.get("workers", {}))
@@ -243,7 +246,6 @@ def start(n: int | None = None, memory_limit: str = "auto") -> DimosCluster:
     """
 
     from dask.distributed import Client, LocalCluster
-    from rich.console import Console
 
     console = Console()
     if not n:
