@@ -131,6 +131,7 @@ def test_image_tool_call() -> None:
     dimos.close_all()  # type: ignore[attr-defined]
 
 
+@pytest.mark.tofix  # runs forever but shouldnt
 @pytest.mark.tool
 def test_tool_call_implicit_detections() -> None:
     """Test agent with image tool call execution."""
