@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Sensor storage and replay."""
+"""Time series storage and replay."""
 
-from dimos.memory.sensor.base import InMemoryStore, TimeSeriesStore
-from dimos.memory.sensor.pickledir import PickleDirStore
-from dimos.memory.sensor.postgres import PostgresStore, reset_db
-from dimos.memory.sensor.sqlite import SqliteStore
+from dimos.memory.timeseries.base import TimeSeriesStore
+from dimos.memory.timeseries.inmemory import InMemoryStore
+from dimos.memory.timeseries.pickledir import PickleDirStore
+from dimos.memory.timeseries.postgres import PostgresStore, reset_db
+from dimos.memory.timeseries.sqlite import SqliteStore
 
 __all__ = [
     "InMemoryStore",

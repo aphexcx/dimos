@@ -16,7 +16,7 @@
 For the original implementation, see replay_legacy.py.
 """
 
-from dimos.memory.sensor.legacy import LegacyPickleStore
+from dimos.memory.timeseries.legacy import LegacyPickleStore
 
 SensorReplay = LegacyPickleStore
 SensorStorage = LegacyPickleStore

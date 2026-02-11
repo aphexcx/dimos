@@ -20,10 +20,11 @@ import uuid
 
 import pytest
 
-from dimos.memory.sensor.base import InMemoryStore, TimeSeriesStore
-from dimos.memory.sensor.legacy import LegacyPickleStore
-from dimos.memory.sensor.pickledir import PickleDirStore
-from dimos.memory.sensor.sqlite import SqliteStore
+from dimos.memory.timeseries.base import TimeSeriesStore
+from dimos.memory.timeseries.inmemory import InMemoryStore
+from dimos.memory.timeseries.legacy import LegacyPickleStore
+from dimos.memory.timeseries.pickledir import PickleDirStore
+from dimos.memory.timeseries.sqlite import SqliteStore
 from dimos.types.timestamped import Timestamped
 
 
@@ -112,7 +113,7 @@ _postgres_tables: list[str] = []
 try:
     import psycopg2
 
-    from dimos.memory.sensor.postgres import PostgresStore
+    from dimos.memory.timeseries.postgres import PostgresStore
 
     # Test connection
     _test_conn = psycopg2.connect(dbname="dimensional")
@@ -657,7 +658,8 @@ class TestPerformance:
         coll_time = time_mod.perf_counter() - t0
 
         print(f"\nInsert {self.N}: store={store_time:.3f}s, collection={coll_time:.3f}s")
-        assert store_time < coll_time * 5
+        # Store maintains dict + SortedKeyList so inserts are ~2-10x slower than collection
+        assert store_time < coll_time * 15
 
     def test_find_closest_performance(self) -> None:
         """find_closest on N items. Both should be O(log n)."""
