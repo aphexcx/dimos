@@ -30,6 +30,7 @@
 #include <thread>
 #include <vector>
 
+#include "cloud_filter.hpp"
 #include "dimos_native_module.hpp"
 
 // dimos LCM message headers
@@ -396,6 +397,10 @@ int main(int argc, char** argv) {
     g_child_frame_id = mod.arg("child_frame_id", "body");
     float pointcloud_freq = mod.arg_float("pointcloud_freq", 5.0f);
     float odom_freq = mod.arg_float("odom_freq", 50.0f);
+    CloudFilterConfig filter_cfg;
+    filter_cfg.voxel_size = mod.arg_float("voxel_size", 0.1f);
+    filter_cfg.sor_mean_k = mod.arg_int("sor_mean_k", 50);
+    filter_cfg.sor_stddev = mod.arg_float("sor_stddev", 1.0f);
 
     // SDK network ports
     SdkPorts ports;
@@ -420,6 +425,8 @@ int main(int argc, char** argv) {
            host_ip.c_str(), lidar_ip.c_str(), g_frequency);
     printf("[fastlio2] pointcloud_freq: %.1f Hz  odom_freq: %.1f Hz\n",
            pointcloud_freq, odom_freq);
+    printf("[fastlio2] voxel_size: %.3f  sor_mean_k: %d  sor_stddev: %.1f\n",
+           filter_cfg.voxel_size, filter_cfg.sor_mean_k, filter_cfg.sor_stddev);
 
     // Signal handlers
     signal(SIGTERM, signal_handler);
@@ -541,7 +548,8 @@ int main(int argc, char** argv) {
 
                 // Publish aggregated cloud at pointcloud_freq
                 if (now - last_pc_publish >= pc_interval && !accumulated_scan->empty()) {
-                    publish_lidar(accumulated_scan, ts);
+                    auto filtered = filter_cloud<PointType>(accumulated_scan, filter_cfg);
+                    publish_lidar(filtered, ts);
                     accumulated_scan->clear();
                     last_pc_publish = now;
                 }

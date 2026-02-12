@@ -63,6 +63,11 @@ class FastLio2Config(NativeModuleConfig):
     pointcloud_freq: float = 10.0
     odom_freq: float = 30.0
 
+    # Point cloud filtering
+    voxel_size: float = 0.1
+    sor_mean_k: int = 50
+    sor_stddev: float = 1.0
+
     # FAST-LIO config (written to JSON, passed as --config_path)
     scan_line: int = 4
     blind: float = 0.5
@@ -124,6 +129,12 @@ class FastLio2(NativeModule):
             str(cfg.pointcloud_freq),
             "--odom_freq",
             str(cfg.odom_freq),
+            "--voxel_size",
+            str(cfg.voxel_size),
+            "--sor_mean_k",
+            str(cfg.sor_mean_k),
+            "--sor_stddev",
+            str(cfg.sor_stddev),
             "--cmd_data_port",
             str(cfg.cmd_data_port),
             "--push_msg_port",
