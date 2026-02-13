@@ -25,6 +25,6 @@ Closes DIM-XXX
 
 <!-- MUST be reproducible. If this section is weak, reviewers can't approve confidently. -->
 
-## CLA
+## Contributor License Agreement
 
-- [ ] I have read and approved the [Contributor License Agreement](https://github.com/dimensionalOS/dimos/blob/main/CLA.md).
+- [ ] I have read and approved the [CLA](https://github.com/dimensionalOS/dimos/blob/main/CLA.md).
