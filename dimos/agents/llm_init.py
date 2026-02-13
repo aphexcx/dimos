@@ -28,10 +28,10 @@ def build_llm(config: AgentConfig) -> BaseChatModel:
     if config.model_instance:
         return config.model_instance
 
-    if config.provider.value.lower() == "ollama":
+    if config.provider.value == "ollama":
         ensure_ollama_model(config.model)
 
-    if config.provider.value.lower() == "huggingface":
+    if config.provider.value == "huggingface":
         llm = HuggingFacePipeline.from_model_id(
             model_id=config.model,
             task="text-generation",
