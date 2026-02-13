@@ -75,7 +75,7 @@ RERUN_WEB_PORT = 9090
 # This is easy to reconstruct but a service/tf.py already does this so should be integrated here
 #
 # we have decoupled entity paths and actual transforms (like ROS TF frames)
-# https://rerun.io/docs/usage/logging-and-ingestion/transforms
+# https://rerun.io/docs/concepts/logging-and-ingestion/transforms
 #
 # tf#/world
 # tf#/base_link
