@@ -97,7 +97,7 @@ all_modules = {
     "llm_agent": "dimos.agents.agent",
     "manipulation_module": "dimos.manipulation.manipulation_module",
     "mapper": "dimos.robot.unitree_webrtc.type.map",
-    "mid360_cpp_module": "dimos.hardware.sensors.lidar.livox.module",
+    "mid360_module": "dimos.hardware.sensors.lidar.livox.module",
     "navigation_skill": "dimos.agents.skills.navigation",
     "object_scene_registration_module": "dimos.perception.object_scene_registration",
     "object_tracking": "dimos.perception.object_tracker",

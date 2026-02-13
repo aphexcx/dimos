@@ -20,11 +20,11 @@ the Livox SDK2 C API and publishes on LCM.
 
 Usage::
 
-    from dimos.hardware.sensors.lidar.livox.module import Mid360CppModule
+    from dimos.hardware.sensors.lidar.livox.module import Mid360Module
     from dimos.core.blueprints import autoconnect
 
     autoconnect(
-        Mid360CppModule.blueprint(host_ip="192.168.1.5"),
+        Mid360Module.blueprint(host_ip="192.168.1.5"),
         SomeConsumer.blueprint(),
     ).build().loop()
 """
@@ -44,7 +44,7 @@ _DEFAULT_EXECUTABLE = str(Path(__file__).parent / "cpp" / "build" / "mid360_nati
 
 
 @dataclass(kw_only=True)
-class Mid360CppConfig(NativeModuleConfig):
+class Mid360Config(NativeModuleConfig):
     """Config for the C++ Mid-360 native module."""
 
     executable: str = _DEFAULT_EXECUTABLE
@@ -68,7 +68,7 @@ class Mid360CppConfig(NativeModuleConfig):
     host_log_data_port: int = 56501
 
 
-class Mid360CppModule(NativeModule, perception.Lidar, perception.IMU):
+class Mid360Module(NativeModule, perception.Lidar, perception.IMU):
     """Livox Mid-360 LiDAR module backed by a native C++ binary.
 
     Ports:
@@ -76,8 +76,8 @@ class Mid360CppModule(NativeModule, perception.Lidar, perception.IMU):
         imu (Out[Imu]): IMU data at ~200 Hz (if enabled).
     """
 
-    config: Mid360CppConfig
-    default_config = Mid360CppConfig
+    config: Mid360Config
+    default_config = Mid360Config
 
     pointcloud: Out[PointCloud2]
     imu: Out[Imu]
@@ -87,10 +87,10 @@ class Mid360CppModule(NativeModule, perception.Lidar, perception.IMU):
         return self.config.to_cli_args()
 
 
-mid360_cpp_module = Mid360CppModule.blueprint
+mid360_module = Mid360Module.blueprint
 
 __all__ = [
-    "Mid360CppConfig",
-    "Mid360CppModule",
-    "mid360_cpp_module",
+    "Mid360Config",
+    "Mid360Module",
+    "mid360_module",
 ]

@@ -35,16 +35,16 @@ for the C++ message headers on first configure.
 
 ## Usage
 
-Normally launched by `Mid360CppModule` via the NativeModule framework — you
+Normally launched by `Mid360Module` via the NativeModule framework — you
 don't run it directly. The Python wrapper passes LCM topic strings and config
 as CLI args:
 
 ```python
-from dimos.hardware.sensors.lidar.livox.module import Mid360CppModule
+from dimos.hardware.sensors.lidar.livox.module import Mid360Module
 from dimos.core.blueprints import autoconnect
 
 autoconnect(
-    Mid360CppModule.blueprint(host_ip="192.168.1.5"),
+    Mid360Module.blueprint(host_ip="192.168.1.5"),
     SomeConsumer.blueprint(),
 ).build().loop()
 ```
@@ -69,5 +69,5 @@ name used by dimos subscribers.
 |---|---|
 | `main.cpp` | Livox SDK2 callbacks, frame accumulation, LCM publishing |
 | `dimos_native_module.hpp` | Reusable header for parsing NativeModule CLI args |
-| `../module.py` | Python NativeModule wrapper (`Mid360CppModule`) |
+| `../module.py` | Python NativeModule wrapper (`Mid360Module`) |
 | `CMakeLists.txt` | Build config, fetches dimos-lcm headers automatically |

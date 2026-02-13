@@ -16,14 +16,14 @@
 
 from __future__ import annotations
 
-from dimos.hardware.sensors.lidar.livox.module import Mid360CppModule
+from dimos.hardware.sensors.lidar.livox.module import Mid360Module
 from dimos.spec import perception
 from dimos.spec.utils import assert_implements_protocol
 
 
 def test_livox_module_implements_lidar_spec() -> None:
-    assert_implements_protocol(Mid360CppModule, perception.Lidar)
+    assert_implements_protocol(Mid360Module, perception.Lidar)
 
 
 def test_livox_module_implements_imu_spec() -> None:
-    assert_implements_protocol(Mid360CppModule, perception.IMU)
+    assert_implements_protocol(Mid360Module, perception.IMU)

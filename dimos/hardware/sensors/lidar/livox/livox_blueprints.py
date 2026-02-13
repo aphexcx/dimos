@@ -13,10 +13,10 @@
 # limitations under the License.
 
 from dimos.core.blueprints import autoconnect
-from dimos.hardware.sensors.lidar.livox.module import Mid360CppModule
+from dimos.hardware.sensors.lidar.livox.module import Mid360Module
 from dimos.visualization.rerun.bridge import rerun_bridge
 
 mid360 = autoconnect(
-    Mid360CppModule.blueprint(),
+    Mid360Module.blueprint(),
     rerun_bridge(),
 ).global_config(n_dask_workers=2, robot_model="mid360")

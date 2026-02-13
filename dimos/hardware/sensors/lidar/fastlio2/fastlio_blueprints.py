@@ -38,9 +38,6 @@ mid360_fastlio_voxels_native = autoconnect(
     ),
 ).global_config(n_dask_workers=2, robot_model="mid360_fastlio2")
 
-
-rerun_config = {}
-
 mid360_fastlio_voxels = autoconnect(
     FastLio2.blueprint(),
     VoxelGridMapper.blueprint(publish_interval=1.0, voxel_size=voxel_size, carve_columns=False),
