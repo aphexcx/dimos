@@ -42,6 +42,7 @@ dependencies = [
     "pydantic",
     "python-dotenv",
     "annotation-protocol>=1.4.0",
+    "lazy_loader",
 
     # Multiprocess
     "dask[complete]==2025.5.1",
@@ -125,9 +126,9 @@ visualization = [
 ]
 
 agents = [
-    "langchain>=1,<1.2.4",
+    "langchain==1.2.3",
     "langchain-chroma>=1,<2",
-    "langchain-core>=1,<2",
+    "langchain-core==1.2.3",
     "langchain-openai>=1,<2",
     "langchain-text-splitters>=1,<2",
     "langchain-huggingface>=1,<2",
@@ -173,19 +174,6 @@ manipulation = [
     # Planning (Drake)
     "drake>=1.40.0",
 
-    # Contact Graspnet Dependencies
-    "h5py>=3.7.0",
-    "pyrender>=0.1.45",
-    "trimesh>=3.22.0",
-    "python-fcl>=0.7.0.4",
-    "pyquaternion>=0.9.9",
-    "matplotlib>=3.7.1",
-    "rtree",
-    "pandas>=1.5.2",
-    "tqdm>=4.65.0",
-    "pyyaml>=6.0",
-    "contact-graspnet-pytorch",
-
     # Hardware SDKs
     "piper-sdk",
     "xarm-python-sdk>=1.17.0",
@@ -194,6 +182,10 @@ manipulation = [
     "kaleido>=0.2.1",
     "plotly>=5.9.0",
     "xacro",
+
+    # Other
+    "matplotlib>=3.7.1",
+    "pyyaml>=6.0",
 ]
 
 
@@ -394,7 +386,6 @@ markers = [
     "module: tests that need to run directly as modules",
     "gpu: tests that require GPU",
     "cuda: tests which require CUDA (specifically CUDA not just GPU acceleration)",
-    "tofix: temporarily disabled test",
     "e2e: end to end tests",
     "integration: slower integration tests",
     "neverending: they don't finish",
@@ -404,7 +395,7 @@ env = [
   "GOOGLE_MAPS_API_KEY=AIzafake_google_key",
   "PYTHONWARNINGS=ignore:cupyx.jit.rawkernel is experimental:FutureWarning",
 ]
-addopts = "-v -p no:warnings -ra --color=yes -m 'not (vis or exclude or tool or lcm or ros or heavy or gpu or module or tofix or e2e or integration or neverending or mujoco)'"
+addopts = "-v -p no:warnings -ra --color=yes -m 'not (vis or exclude or tool or lcm or ros or heavy or gpu or module or e2e or integration or neverending or mujoco)'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
@@ -416,12 +407,3 @@ ignore = [
     "dimos/dashboard/dimos.rbl",
     "dimos/web/dimos_interface/themes.json",
 ]
-
-[tool.uv]
-# Build dependencies for packages that don't declare them properly
-extra-build-dependencies = { contact-graspnet-pytorch = ["numpy"] }
-
-default-groups = []
-
-[tool.uv.sources]
-contact-graspnet-pytorch = { git = "https://github.com/dimensionalOS/contact_graspnet_pytorch.git" }
