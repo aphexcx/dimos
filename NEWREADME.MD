@@ -130,14 +130,14 @@ Now install the Python package.
 
 Check the [hardware section](#hardware) above to choose the right `extras` and `blueprint` for your platform.
 
-*Use DimOS as a library / UI*
+**Use DimOS as a library / UI**
 
 ```bash
 pip install dimos[your_platform]
 dimos run your_platform_blueprint
 ```
 
-*Develop DimOS*
+**Develop DimOS**
 
 ```bash
 git clone https://github.com/dimensionalOS/dimos/ dimos
