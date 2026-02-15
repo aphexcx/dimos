@@ -52,15 +52,16 @@ We don't connect to the LiDAR directly — instead we use Unitree's WebRTC clien
 
 The [`VoxelGridMapper`](/dimos/mapping/voxels.py) maintains a sparse 3D occupancy grid using Open3D's `VoxelBlockGrid` backed by a hash map. Each voxel is a 5cm cube by default.
 
-Each incoming LiDAR frame is spliced into the global map via column carving. We consider any previously mapped voxels in the space of a received LiDAR frame stale — the sensor has a fresh observation. By erasing entire Z-columns in the footprint, we guarantee:
+Voxel hash map provides O(1) insert/erase/lookup, so this is efficient even with millions of voxels. The grid runs on **CUDA** by default for speed, with CPU fallback.
+
+Each incoming LiDAR frame is spliced into the global map via column carving. We consider any previously mapped voxels in the space of a received LiDAR frame stale, by erasing entire Z-columns in the footprint, we guarantee:
 
 - No ghost obstacles from previous passes
 - Dynamic objects (people, doors) get cleared automatically
 - The latest observation always wins
 
-We don't have proper loop closure and stable odometry, we trust the data go2 reports, which is surprisingly stable but does drift eventually, You will reliably map and nav through very large spaces (500sqm in our tests) but you won't go down the street to a super market.
+We don't have proper loop closure and stable odometry, we trust the data go2 odom reports, which is surprisingly stable but does drift eventually, You will reliably map and nav through very large spaces (500sqm in our tests) but you won't go down the street to a super market.
 
-Voxel hash map provides O(1) insert/erase/lookup, so this is efficient even with millions of voxels. The grid runs on **CUDA** by default for speed, with CPU fallback.
 
 #### Configuration
 
