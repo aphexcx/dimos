@@ -70,14 +70,19 @@
     <td align="center" width="25%">
       <h3>Humanoid</h3>
       <img width="200" height="1" src="">
+      <a href="docs/hardware/dog/go2/index.md">Unitree G1</a>
     </td>
     <td align="center" width="25%">
       <h3>Arm</h3>
       <img width="200" height="1" src="">
+      <a href="docs/hardware/dog/go2/index.md">Xarm</a>
+      <a href="docs/hardware/dog/go2/index.md">Piper</a>
     </td>
     <td align="center" width="25%">
       <h3>Drone</h3>
       <img width="200" height="1" src="">
+      <a href="docs/hardware/dog/go2/index.md">Mavlink</a>
+      <a href="docs/hardware/dog/go2/index.md">DJI SDK</a>
     </td>
   </tr>
 </table>
