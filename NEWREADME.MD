@@ -65,24 +65,24 @@
     <td align="center" width="25%">
       <h3>Dog</h3>
       <img width="200" height="1" src="">
-      <a href="docs/hardware/dog/go2/index.md">Unitree Go2 pro/air</a>
+      <a href="docs/hardware/dog/go2/index.md">Unitree Go2 pro/air</a><br>
     </td>
     <td align="center" width="25%">
       <h3>Humanoid</h3>
       <img width="200" height="1" src="">
-      <a href="docs/hardware/dog/go2/index.md">Unitree G1</a>
+      <a href="docs/hardware/dog/go2/index.md">Unitree G1</a><br>
     </td>
     <td align="center" width="25%">
       <h3>Arm</h3>
       <img width="200" height="1" src="">
-      <a href="docs/hardware/dog/go2/index.md">Xarm</a>
-      <a href="docs/hardware/dog/go2/index.md">Piper</a>
+      <a href="docs/hardware/dog/go2/index.md">Xarm</a><br>
+      <a href="docs/hardware/dog/go2/index.md">Piper</a><br>
     </td>
     <td align="center" width="25%">
       <h3>Drone</h3>
       <img width="200" height="1" src="">
-      <a href="docs/hardware/dog/go2/index.md">Mavlink</a>
-      <a href="docs/hardware/dog/go2/index.md">DJI SDK</a>
+      <a href="docs/hardware/dog/go2/index.md">Mavlink</a><br>
+      <a href="docs/hardware/dog/go2/index.md">DJI SDK</a><br>
     </td>
   </tr>
 </table>
