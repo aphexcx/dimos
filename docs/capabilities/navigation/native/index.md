@@ -9,17 +9,33 @@ The Go2 navigation stack runs entirely without ROS. It uses a **column-carving v
 <details>
 <summary>diagram source</summary>
 
+<details><summary>Pikchr</summary>
+
 ```pikchr fold output=assets/go2nav_dataflow.svg
 color = white
 fill = none
 
 Go2: box "Go2" rad 5px fit wid 170% ht 170%
-arrow right 0.5in "PointCloud2" above italic
+arrow right 0.5in
 Vox: box "VoxelGridMapper" rad 5px fit wid 170% ht 170%
-arrow right 0.5in "PointCloud2" above italic
+arrow right 0.5in
 Cost: box "CostMapper" rad 5px fit wid 170% ht 170%
-arrow right 0.5in "OccupancyGrid" above italic
+arrow right 0.5in
 Nav: box "Navigation" rad 5px fit wid 170% ht 170%
+
+M1: dot at 1/2 way between Go2.e and Vox.w invisible
+text "PointCloud2" italic at (M1.x, Go2.n.y + 0.15in)
+
+M2: dot at 1/2 way between Vox.e and Cost.w invisible
+text "PointCloud2" italic at (M2.x, Vox.n.y + 0.15in)
+
+M3: dot at 1/2 way between Cost.e and Nav.w invisible
+text "OccupancyGrid" italic at (M3.x, Cost.n.y + 0.15in)
+
+line dashed from Nav.s down 0.3in then left until even with Go2.s then to Go2.s
+arrow dashed from Go2.s + (0.01in, 0.01in) to Go2.s
+M4: dot at 1/2 way between Go2.s and Nav.s invisible
+text "Twist" italic at (M4.x, Nav.s.y - 0.45in)
 ```
 
 </details>
