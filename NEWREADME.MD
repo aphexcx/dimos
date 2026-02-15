@@ -91,6 +91,10 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
       <h3>Drone</h3>
       <img width="245" height="1" src="assets/readme/spacer.png">
     </td>
+    <td align="center" width="25%">
+      <h3>Misc</h3>
+      <img width="245" height="1" src="assets/readme/spacer.png">
+    </td>
   </tr>
 
   <tr>
@@ -107,6 +111,9 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
     <td align="center" width="25%">
       <a href="docs/hardware/dog/go2/index.md">Mavlink</a> <img src="https://img.shields.io/badge/stable-green?style=flat-square"><br>
       <a href="docs/hardware/dog/go2/index.md">DJI SDK</a> <img src="https://img.shields.io/badge/experimental-red?style=flat-square"><br>
+    </td>
+    <td align="center" width="25%">
+      <a href="docs/hardware/force-torque/index.md">Force Torque Sensor</a> <img src="https://img.shields.io/badge/stable-green?style=flat-square"><br>
     </td>
   </tr>
 </table>
