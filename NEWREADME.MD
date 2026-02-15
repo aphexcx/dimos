@@ -27,7 +27,7 @@
       <img src="assets/readme/nav.png" alt="Navigation" width="100%">
     </td>
     <td align="center" width="50%">
-      <img src="assets/readme/detections.png" alt="Det" width="100%">
+      <img src="assets/readme/perception.png" alt="Det" width="100%">
     </td>
   </tr>
   <tr>
