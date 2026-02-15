@@ -9,6 +9,8 @@ The Go2 navigation stack runs entirely without ROS. It uses a **column-carving v
 <details>
 <summary>diagram source</summary>
 
+<details><summary>Pikchr</summary>
+
 ```pikchr fold output=assets/go2nav_dataflow.svg
 color = white
 fill = none
@@ -34,10 +36,12 @@ arrow dashed from Nav.s down 0.3in then left until even with Go2.s then to Go2.s
 M4: dot at 1/2 way between Go2.s and Nav.s invisible
 text "Twist" italic at (M4.x, Nav.s.y - 0.45in)
 ```
+
 </details>
 
 <!--Result:-->
 ![output](assets/go2nav_dataflow.svg)
+</details>
 
 ## Pipeline Steps
 
@@ -83,7 +87,7 @@ algo settings are in [`occupancy.py`](/dimos/mapping/pointclouds/occupancy.py) a
 
 #### Configuration
 
-```python
+```python skip
 @dataclass(frozen=True)
 class HeightCostConfig(OccupancyConfig):
     """Config for height-cost based occupancy (terrain slope analysis)."""
@@ -120,12 +124,29 @@ All visualization layers shown together
 
 The navigation stack is composed in the [`unitree_go2`](/dimos/robot/unitree/go2/blueprints/__init__.py) blueprint:
 
-```python skip
+<details><summary>Python</summary>
+
+```python fold output=assets/go2_blueprint.svg
+from dimos.core.blueprints import autoconnect
+from dimos.core.introspection import to_svg
+from dimos.mapping.costmapper import cost_mapper
+from dimos.mapping.voxels import voxel_mapper
+from dimos.navigation.frontier_exploration import wavefront_frontier_explorer
+from dimos.navigation.replanning_a_star.module import replanning_a_star_planner
+from dimos.robot.unitree.go2.blueprints.basic.unitree_go2_basic import unitree_go2_basic
+
 unitree_go2 = autoconnect(
     unitree_go2_basic,                    # robot connection + visualization
-    voxel_mapper(voxel_size=0.1),         # 3D voxel mapping - Voxel Mapper config goes here
-    cost_mapper(),                        # 2D costmap generation - Costmapper config goes here
+    voxel_mapper(voxel_size=0.05),        # 3D voxel mapping
+    cost_mapper(),                        # 2D costmap generation
     replanning_a_star_planner(),          # path planning
     wavefront_frontier_explorer(),        # exploration
 ).global_config(n_dask_workers=6, robot_model="unitree_go2")
+
+to_svg(unitree_go2, "assets/go2_blueprint.svg")
 ```
+
+</details>
+
+<!--Result:-->
+![output](assets/go2_blueprint.svg)
