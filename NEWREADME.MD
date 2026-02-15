@@ -130,9 +130,9 @@ Now install the Python package.
 
 Check the [hardware section](#hardware) above to choose the right `extras` and `blueprint` for your platform.
 
-$${\Large\color{cyan}\texttt{pip}\ \color{white}\texttt{install}\ \color{green}\texttt{dimos}\color{gray}\texttt{[}\color{yellow}\texttt{your\_platform}\color{gray}\texttt{]}}$$
+$${\Large\color{cyan}\mathtt{pip}\ \color{white}\mathtt{install}\ \color{green}\mathtt{dimos}\color{gray}\mathtt{[}\color{yellow}\mathtt{your\textunderscore platform}\color{gray}\mathtt{]}}$$
 
-$${\Large\color{cyan}\texttt{dimos}\ \color{white}\texttt{run}\ \color{yellow}\texttt{your\_platform\_blueprint}}$$
+$${\Large\color{cyan}\mathtt{dimos}\ \color{white}\mathtt{run}\ \color{yellow}\mathtt{your\textunderscore platform\textunderscore blueprint}}$$
 
 ### Step 3 - Profit
 
