@@ -103,7 +103,7 @@ Our goal is to provide an easy to install and run modern framework for general r
 
 # Installation
 
-## Step 1 - System Install
+### Step 1 - System Install
 
 to setup your system dependencies follow one of these:
 
@@ -112,16 +112,16 @@ to setup your system dependencies follow one of these:
 - [Ubuntu 24.04](docs/installation/ubuntu.md)
 
 
-## Step 2 - Python Install
+### Step 2 - Python Install
 
-We are ready to jump into Python
+We are ready to jump into Python, check specific hardware docs above to choose appropriate pip install command and a blueprint to run
 
 ```sh
 pip install dimos[your_platform]
 dimos run your_platform_blueprint
 ```
 
-## Step 3 - Profit!
+### Step 3 - Profit!
 
 ![DimOS Demo](assets/readme/dimos_demo.gif)
 
