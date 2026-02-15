@@ -72,10 +72,11 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
 
 
 # Hardware
+
+<br>
 <div align="center">
 🟢 stable • 🟡 beta • 🟠 alpha • 🔴 experimental
 </div>
-
 <br>
 
 <table>
