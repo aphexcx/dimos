@@ -63,8 +63,9 @@
 <table>
   <tr>
     <td align="center" width="25%">
-      <h3><a href="docs/hardware/dog/go2/index.md">Dog</a></h3>
+      <h3>Dog</h3>
       <img width="200" height="1" src="">
+      <a href="docs/hardware/dog/go2/index.md">Unitree Go2 pro/air</a>
     </td>
     <td align="center" width="25%">
       <h3>Humanoid</h3>
