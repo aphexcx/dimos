@@ -124,8 +124,6 @@ All visualization layers shown together
 
 The navigation stack is composed in the [`unitree_go2`](/dimos/robot/unitree/go2/blueprints/__init__.py) blueprint:
 
-<details><summary>Python</summary>
-
 ```python fold output=assets/go2_blueprint.svg
 from dimos.core.blueprints import autoconnect
 from dimos.core.introspection import to_svg
@@ -145,8 +143,6 @@ unitree_go2 = autoconnect(
 
 to_svg(unitree_go2, "assets/go2_blueprint.svg")
 ```
-
-</details>
 
 <!--Result:-->
 ![output](assets/go2_blueprint.svg)
