@@ -170,7 +170,10 @@ dimos --replay run unitree-go2
 
 Python is our glue and prototyping language, but we support many languages via LCM interop.
 
-Check our [examples/language-interop](examples/language-interop/) for C++, Lua, and TypeScript examples.
+Check our language interop examples:
+- [C++](examples/language-interop/cpp/)
+- [Lua](examples/language-interop/lua/)
+- [TypeScript](examples/language-interop/ts/)
 
 ## ROS interop
 
