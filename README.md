@@ -34,37 +34,37 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="assets/readme/navigation.gif" alt="Navigation" width="100%">
+      <a href="docs/capabilities/navigation/readme.md"><img src="assets/readme/navigation.gif" alt="Navigation" width="100%"></a>
     </td>
     <td align="center" width="50%">
-      <img src="assets/readme/perception.png" alt="Det" width="100%">
+      <a href="docs/capabilities/perception/readme.md"><img src="assets/readme/perception.png" alt="Perception" width="100%"></a>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <h3>Navigation and Mapping</h3>
+      <h3><a href="docs/capabilities/navigation/readme.md">Navigation and Mapping</a></h3>
       ros and non ros<br><a href="#">Watch video</a>
     </td>
     <td align="center" width="50%">
-      <h3>Perception</h3>
+      <h3><a href="docs/capabilities/perception/readme.md">Perception</a></h3>
       bla bla perception<br><a href="#">Watch video</a>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="assets/readme/agents.png" alt="Agents" width="100%">
+      <a href="docs/capabilities/agents/readme.md"><img src="assets/readme/agents.png" alt="Agents" width="100%"></a>
     </td>
     <td align="center" width="50%">
-      <img src="assets/readme/lidar.gif" alt="Sensor Integrations" width="100%">
+      <a href="docs/api/data_streams/README.md"><img src="assets/readme/lidar.gif" alt="Sensor Integrations" width="100%"></a>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <h3>Agentic Control, MCP</h3>
+      <h3><a href="docs/capabilities/agents/readme.md">Agentic Control, MCP</a></h3>
       "hey Claude, go to the kitchen"<br><a href="https://x.com/lesh_bla/status/2014904935088062503">Watch video</a>
     </td>
     <td align="center" width="50%">
-      <h3>Sensor Integrations</h3>
+      <h3><a href="docs/api/data_streams/README.md">Sensor Integrations</a></h3>
       <a href="">Livox Mid360</a>, <a href="">Zed</a>
     </td>
   </tr>
