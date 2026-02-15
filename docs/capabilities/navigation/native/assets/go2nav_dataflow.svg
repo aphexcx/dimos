@@ -1,0 +1,19 @@
+<svg xmlns='http://www.w3.org/2000/svg' style='font-size:initial;' class="pikchr" viewBox="0 0 937.682 55.728">
+<path d="M9.66,53.568L69.4709,53.568A7.5 7.5 0 0 0 76.9709 46.068L76.9709,9.66A7.5 7.5 0 0 0 69.4709 2.16L9.66,2.16A7.5 7.5 0 0 0 2.16 9.66L2.16,46.068A7.5 7.5 0 0 0 9.66 53.568Z"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="39.5654" y="27.864" text-anchor="middle" fill="rgb(255,255,255)" dominant-baseline="central">Go2</text>
+<polygon points="148.971,27.864 137.451,32.184 137.451,23.544" style="fill:rgb(255,255,255)"/>
+<path d="M76.9709,27.864L143.211,27.864"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="112.971" y="16.164" text-anchor="middle" font-style="italic" fill="rgb(255,255,255)" dominant-baseline="central">PointCloud2</text>
+<path d="M156.471,53.568L412.513,53.568A7.5 7.5 0 0 0 420.013 46.068L420.013,9.66A7.5 7.5 0 0 0 412.513 2.16L156.471,2.16A7.5 7.5 0 0 0 148.971 9.66L148.971,46.068A7.5 7.5 0 0 0 156.471 53.568Z"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="284.492" y="27.864" text-anchor="middle" fill="rgb(255,255,255)" dominant-baseline="central">VoxelGridMapper</text>
+<polygon points="492.013,27.864 480.493,32.184 480.493,23.544" style="fill:rgb(255,255,255)"/>
+<path d="M420.013,27.864L486.253,27.864"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="456.013" y="16.164" text-anchor="middle" font-style="italic" fill="rgb(255,255,255)" dominant-baseline="central">PointCloud2</text>
+<path d="M499.513,53.568L679.962,53.568A7.5 7.5 0 0 0 687.462 46.068L687.462,9.66A7.5 7.5 0 0 0 679.962 2.16L499.513,2.16A7.5 7.5 0 0 0 492.013 9.66L492.013,46.068A7.5 7.5 0 0 0 499.513 53.568Z"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="589.738" y="27.864" text-anchor="middle" fill="rgb(255,255,255)" dominant-baseline="central">CostMapper</text>
+<polygon points="759.462,27.864 747.942,32.184 747.942,23.544" style="fill:rgb(255,255,255)"/>
+<path d="M687.462,27.864L753.702,27.864"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="723.462" y="16.164" text-anchor="middle" font-style="italic" fill="rgb(255,255,255)" dominant-baseline="central">OccupancyGrid</text>
+<path d="M766.962,53.568L928.022,53.568A7.5 7.5 0 0 0 935.522 46.068L935.522,9.66A7.5 7.5 0 0 0 928.022 2.16L766.962,2.16A7.5 7.5 0 0 0 759.462 9.66L759.462,46.068A7.5 7.5 0 0 0 766.962 53.568Z"  style="fill:none;stroke-width:2.16;stroke:rgb(255,255,255);" />
+<text x="847.492" y="27.864" text-anchor="middle" fill="rgb(255,255,255)" dominant-baseline="central">Navigation</text>
+</svg>
