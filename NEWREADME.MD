@@ -99,24 +99,26 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
 
   <tr>
     <td align="center" width="20%">
-      <a href="docs/hardware/dog/go2/index.md">Unitree Go2 pro/air</a> <img src="https://img.shields.io/badge/stable-green?style=flat-square"><br>
+      <a href="docs/hardware/dog/go2/index.md">Unitree Go2 pro/air</a> 🟢<br>
     </td>
     <td align="center" width="20%">
-      <a href="docs/hardware/dog/go2/index.md">Unitree G1</a> <img src="https://img.shields.io/badge/alpha-orange?style=flat-square"><br>
+      <a href="docs/hardware/dog/go2/index.md">Unitree G1</a> 🟠<br>
     </td>
     <td align="center" width="20%">
-      <a href="docs/hardware/dog/go2/index.md">Xarm</a> <img src="https://img.shields.io/badge/beta-yellow?style=flat-square"><br>
-      <a href="docs/hardware/dog/go2/index.md">Piper</a> <img src="https://img.shields.io/badge/beta-yellow?style=flat-square"><br>
+      <a href="docs/hardware/dog/go2/index.md">Xarm</a> 🟡<br>
+      <a href="docs/hardware/dog/go2/index.md">Piper</a> 🟡<br>
     </td>
     <td align="center" width="20%">
-      <a href="docs/hardware/dog/go2/index.md">Mavlink</a> <img src="https://img.shields.io/badge/stable-green?style=flat-square"><br>
-      <a href="docs/hardware/dog/go2/index.md">DJI SDK</a> <img src="https://img.shields.io/badge/experimental-red?style=flat-square"><br>
+      <a href="docs/hardware/dog/go2/index.md">Mavlink</a> 🟠<br>
+      <a href="docs/hardware/dog/go2/index.md">DJI SDK</a> 🔴<br>
     </td>
     <td align="center" width="20%">
-      <a href="docs/hardware/force-torque/index.md">Force Torque Sensor</a> <img src="https://img.shields.io/badge/stable-green?style=flat-square"><br>
+      <a href="docs/hardware/force-torque/index.md">Force Torque Sensor</a> 🟡<br>
     </td>
   </tr>
 </table>
+
+🟢 stable · 🟡 beta · 🟠 alpha · 🔴 experimental
 
 [New Hardware Integration Guide](docs/hardware/integration_guide.md)
 
