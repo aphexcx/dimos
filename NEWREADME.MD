@@ -111,7 +111,7 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
   </tr>
 </table>
 
-[New Hardware Integration Guide](docs/hardware/integration_guide.md)
+New Hardware Integration Guide
 
 # Installation
 
@@ -130,9 +130,10 @@ Now install the Python package.
 
 Check the [hardware section](#hardware) above to choose the right `extras` and `blueprint` for your platform.
 
-$${\Large\color{cyan}\mathtt{pip}\ \color{white}\mathtt{install}\ \color{green}\mathtt{dimos}\color{gray}\mathtt{[}\color{yellow}\mathtt{your\textunderscore platform}\color{gray}\mathtt{]}}$$
-
-$${\Large\color{cyan}\mathtt{dimos}\ \color{white}\mathtt{run}\ \color{yellow}\mathtt{your\textunderscore platform\textunderscore blueprint}}$$
+```bash
+pip install dimos[your_platform]
+dimos run your_platform_blueprint
+```
 
 ### Step 3 - Profit
 
