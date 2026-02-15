@@ -113,7 +113,7 @@ We run the planner in a constant loop so it will dynamically react to obstacles 
 
 ### 5. All Layers Combined
 
-All visualization layers shown together — 3D voxel map, 2D costmap, and the planned path overlaid in a single view.
+All visualization layers shown together
 
 ![All layers](assets/5-all.png)
 
