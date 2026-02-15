@@ -130,10 +130,9 @@ Now install the Python package.
 
 Check the [hardware section](#hardware) above to choose the right `extras` and `blueprint` for your platform.
 
-```sh
-pip install dimos[your_platform]
-dimos run your_platform_blueprint
-```
+$${\Large\color{cyan}\texttt{pip}\ \color{white}\texttt{install}\ \color{green}\texttt{dimos}\color{gray}\texttt{[}\color{yellow}\texttt{your\_platform}\color{gray}\texttt{]}}$$
+
+$${\Large\color{cyan}\texttt{dimos}\ \color{white}\texttt{run}\ \color{yellow}\texttt{your\_platform\_blueprint}}$$
 
 ### Step 3 - Profit
 
