@@ -98,9 +98,29 @@ to setup your system dependencies follow one of these:
 - [macOS](docs/installation/osx.md)
 - [Ubuntu 24.04](docs/installation/ubuntu.md)
 
-then just
+then you are ready to jump into Python
 
 ```sh
 pip install dimos[your_platform]
 dimos run your_platform_blueprint
 ```
+
+# API
+
+[Blueprints](docs/api/blueprints.md) •
+[Modules](docs/api/modules.md) •
+[Transports](docs/api/transports.md) •
+[Sensor Streams](docs/api/sensor_streams/README.md) •
+[LCM](docs/api/lcm.md) •
+[Configuration](docs/api/configuration.md) •
+[Visualization](docs/api/visualization.md)
+
+# Multi Language Support
+
+Python is our glue and prototyping language, but we support many languages, and ROS interop
+
+check our examples/language-interop
+
+# ROS interop
+
+for researchers etc we can talk to ros directly via [ROS Transports](docs/api/transports.md), or we can host ROS deployments as first class Dimos Modules
