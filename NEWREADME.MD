@@ -4,6 +4,8 @@
 ![Dimensional](assets/dimensional-dark.svg#gh-dark-mode-only)
 ![Dimensional](assets/dimensional-light.svg#gh-light-mode-only)
 
+<h2>Operating System for Generalist Robotics</h2>
+
 [![Discord](https://img.shields.io/discord/1341146487186391173?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/dimos)
 [![Stars](https://img.shields.io/github/stars/dimensionalOS/dimos?style=flat-square)](https://github.com/dimensionalOS/dimos/stargazers)
 [![Forks](https://img.shields.io/github/forks/dimensionalOS/dimos?style=flat-square)](https://github.com/dimensionalOS/dimos/fork)
@@ -11,9 +13,8 @@
 ![Nix](https://img.shields.io/badge/Nix-flakes-5277C3?style=flat-square&logo=NixOS&logoColor=white)
 ![NixOS](https://img.shields.io/badge/NixOS-supported-5277C3?style=flat-square&logo=NixOS&logoColor=white)
 ![CUDA](https://img.shields.io/badge/CUDA-12.x-76B900?style=flat-square&logo=nvidia&logoColor=white)
+![CUDA](https://img.shields.io/badge/CUDA-13.x-76B900?style=flat-square&logo=nvidia&logoColor=white)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
-
-<h2>Operating System for Generalist Robotics</h2>
 
 <big>
 
