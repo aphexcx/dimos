@@ -73,12 +73,6 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
 
 # Hardware
 
-<br>
-<div align="center">
-🟢 stable 🟡 beta 🟠 alpha 🔴 experimental
-</div>
-<br>
-
 <table>
   <tr>
     <td align="center" width="20%">
@@ -123,7 +117,10 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
     </td>
   </tr>
 </table>
-
+<br>
+<div align="right">
+🟢 stable 🟡 beta 🟠 alpha 🔴 experimental
+</div>
 
 [New Hardware Integration Guide](docs/hardware/integration_guide.md)
 
