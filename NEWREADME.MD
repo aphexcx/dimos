@@ -3,9 +3,7 @@
 
 ![Dimensional](assets/dimensional-dark.svg#gh-dark-mode-only)
 ![Dimensional](assets/dimensional-light.svg#gh-light-mode-only)
-<h3>The Agentive Operating System for Generalist Robotics</h3>
-
-
+<h2>Agentic Operating System for Generalist Robotics</h2>
 
 [Features](#the-dimensional-framework) •
 [Installation](#installation) •
