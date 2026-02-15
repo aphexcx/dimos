@@ -29,7 +29,7 @@
   </tr>
   <tr>
     <td align="center" width="50%">
-      <h3>Navigation</h3>
+      <h3>Navigation and Mapping</h3>
       ros and non ros<br><a href="#">Watch video</a>
     </td>
     <td align="center" width="50%">
@@ -42,20 +42,57 @@
       <img src="assets/readme/agents.png" alt="Agents" width="100%">
     </td>
     <td align="center" width="50%">
-      <img src="assets/readme/lidar.gif" alt="Mapping" width="100%">
+      <img src="assets/readme/lidar.gif" alt="Sensor Integrations" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <h3>Agents integration</h3>
-      bla bla MCP<br><a href="https://x.com/lesh_bla/status/2014904935088062503">Watch video</a>
+      <h3>Agentic Control, MCP</h3>
+      "hey Claude, go to the kitchen"<br><a href="https://x.com/lesh_bla/status/2014904935088062503">Watch video</a>
     </td>
     <td align="center" width="50%">
-      <h3>Mapping</h3>
-      Voxels<br><a href="#">Watch video</a>
+      <h3>Sensor Integrations</h3>
+      Livox Mid360, Zed
     </td>
   </tr>
 </table>
+
+
+# Hardware
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <img src="" alt="Dog" width="100%">
+    </td>
+    <td align="center" width="25%">
+      <img src="" alt="Humanoid" width="100%">
+    </td>
+    <td align="center" width="25%">
+      <img src="" alt="Arm" width="100%">
+    </td>
+    <td align="center" width="25%">
+      <img src="" alt="Drone" width="100%">
+    </td>
+  </tr>
+
+  <tr>
+    <td align="center" width="25%">
+      <h3>Dog</h3>
+    </td>
+    <td align="center" width="25%">
+      <h3>Humanoid</h3>
+    </td>
+    <td align="center" width="25%">
+      <h3>Arm</h3>
+    </td>
+    <td align="center" width="25%">
+      <h3>Drone</h3>
+    </td>
+  </tr>
+</table>
+
+
 
 # Installation
 
