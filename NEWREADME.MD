@@ -17,6 +17,9 @@
 
 </div>
 
+# Intro
+
+We aim to provide an easy to install and run modern framework for robotics
 
 <table>
   <tr>
@@ -87,18 +90,17 @@
   </tr>
 </table>
 
-
-
 # Installation
 
-- general linux (nixos)
-- macos
-- ubuntu 2.4
+to setup your system dependencies follow one of these:
 
-# Documentation
+- [NixOS / General Linux](docs/installation/nix.md)
+- [macOS](docs/installation/osx.md)
+- [Ubuntu 24.04](docs/installation/ubuntu.md)
 
+then just
 
-# Development
-
-
-# Contributing
+```sh
+pip install dimos[your_platform]
+dimos run your_platform_blueprint
+```
