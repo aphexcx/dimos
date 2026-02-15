@@ -55,7 +55,7 @@ Our goal is to provide an easy to install and run modern framework for general r
     </td>
     <td align="center" width="50%">
       <h3>Sensor Integrations</h3>
-      Livox Mid360, Zed
+      <a href="">Livox Mid360</a>, <a href="">Zed</a>
     </td>
   </tr>
 </table>
@@ -129,13 +129,13 @@ dimos run your_platform_blueprint
 
 ## API
 
-[Blueprints](docs/api/blueprints.md) •
-[Modules](docs/api/modules.md) •
-[Transports](docs/api/transports.md) •
-[Data Streams](docs/api/data_streams/README.md) •
-[LCM](docs/api/lcm.md) •
-[Configuration](docs/api/configuration.md) •
-[Visualization](docs/api/visualization.md)
+- [Modules](docs/api/modules.md)
+- [LCM](docs/api/lcm.md)
+- [Blueprints](docs/api/blueprints.md)
+- [Transports](docs/api/transports.md)
+- [Data Streams](docs/api/data_streams/README.md)
+- [Configuration](docs/api/configuration.md)
+- [Visualization](docs/api/visualization.md)
 
 ## Multi Language Support
 
