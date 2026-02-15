@@ -7,7 +7,11 @@
                   ██████╔╝██║██║ ╚═╝ ██║███████╗██║ ╚████║███████║██║╚██████╔╝██║ ╚████║██║  ██║███████╗
                   ╚═════╝ ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝
 </pre>
+
 <div align="center">
+
+![Dimensional](assets/dimensional-dark.svg#gh-dark-mode-only)
+![Dimensional](assets/dimensional-light.svg#gh-light-mode-only)
 
 **The Agentive Operating System for Generalist Robotics**
 
