@@ -66,20 +66,20 @@ Our goal is to provide an easy-to-install, modern framework for general robotics
 <table>
   <tr>
     <td align="center" width="25%">
-      <h3>Dog</h3>
-      <img width="200" height="1" src="">
+      <h3>Quadruped</h3>
+      <img width="245" height="1" src="https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000">
     </td>
     <td align="center" width="25%">
       <h3>Humanoid</h3>
-      <img width="200" height="1" src="">
+      <img width="245" height="1" src="https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000">
     </td>
     <td align="center" width="25%">
       <h3>Arm</h3>
-      <img width="200" height="1" src="">
+      <img width="245" height="1" src="https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000">
     </td>
     <td align="center" width="25%">
       <h3>Drone</h3>
-      <img width="200" height="1" src="">
+      <img width="245" height="1" src="https://github.com/user-attachments/assets/00000000-0000-0000-0000-000000000000">
     </td>
   </tr>
 
