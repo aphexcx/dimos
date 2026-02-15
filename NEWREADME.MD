@@ -125,7 +125,9 @@ dimos run your_platform_blueprint
 
 ![DimOS Demo](assets/readme/dimos_demo.gif)
 
-# API
+# Develop
+
+## API
 
 [Blueprints](docs/api/blueprints.md) •
 [Modules](docs/api/modules.md) •
@@ -135,12 +137,12 @@ dimos run your_platform_blueprint
 [Configuration](docs/api/configuration.md) •
 [Visualization](docs/api/visualization.md)
 
-# Multi Language Support
+## Multi Language Support
 
 Python is our glue and prototyping language, but we support many languages, and ROS interop
 
 check our [examples/language-interop](examples/language-interop/)
 
-# ROS interop
+## ROS interop
 
 for researchers we can talk to ros directly via [ROS Transports](docs/api/transports.md), or we can host ROS deployments as first class Dimos Modules
