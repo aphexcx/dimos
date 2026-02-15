@@ -60,18 +60,22 @@
 
 # Hardware
 
-<table width="100%">
+<table>
   <tr>
     <td align="center" width="25%">
+      <img width="200" height="1" src="">
       <h3>Dog</h3>
     </td>
     <td align="center" width="25%">
+      <img width="200" height="1" src="">
       <h3>Humanoid</h3>
     </td>
     <td align="center" width="25%">
+      <img width="200" height="1" src="">
       <h3>Arm</h3>
     </td>
     <td align="center" width="25%">
+      <img width="200" height="1" src="">
       <h3>Drone</h3>
     </td>
   </tr>
