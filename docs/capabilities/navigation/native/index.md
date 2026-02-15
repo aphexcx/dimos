@@ -9,8 +9,6 @@ The Go2 navigation stack runs entirely without ROS. It uses a **column-carving v
 <details>
 <summary>diagram source</summary>
 
-<details><summary>Pikchr</summary>
-
 ```pikchr fold output=assets/go2nav_dataflow.svg
 color = white
 fill = none
@@ -29,8 +27,6 @@ Nav: box "Navigation" rad 5px fit wid 170% ht 170%
 <!--Result:-->
 ![output](assets/go2nav_dataflow.svg)
 
-</details>
-
 ## Pipeline Steps
 
 ### 1. LiDAR Frame — `GO2Connection`
@@ -47,7 +43,19 @@ Each incoming frame is spliced into the global map via column carving. The map g
 
 ### 3. Global Costmap — `CostMapper`
 
-The 3D voxel map is projected down to a 2D occupancy grid. We map the slope of terrain in order to conclude traversability — flat areas (light) are traversable, steep height changes (dark) are obstacles.
+The [`CostMapper`](/dimos/mapping/costmapper.py) converts the 3D voxel map into a 2D occupancy grid. The default algorithm (`height_cost`) works as follows:
+
+1. **Height maps**: For each (X, Y) cell, find min and max Z across all voxels
+2. **Pass-under detection**: If the vertical gap exceeds `can_pass_under` (default 0.6m), the robot can fit underneath — use ground height instead of obstacle height
+3. **Slope analysis**: Apply Sobel filter to the height map to compute terrain gradient
+4. **Cost assignment**: `cost = (gradient × resolution / can_climb) × 100`, clamped to [0, 100]
+
+| Cost | Meaning |
+|------|---------|
+| 0 | Flat, easy to traverse |
+| 50 | Moderate slope (~7.5cm rise per cell) |
+| 100 | Steep or impassable (≥15cm rise per cell) |
+| -1 | Unknown (no observations) |
 
 ![Global costmap](assets/3-globalcostmap.png)
 
@@ -71,6 +79,14 @@ All visualization layers shown together — 3D voxel map, 2D costmap, and the pl
 
 The [`VoxelGridMapper`](/dimos/mapping/voxels.py) maintains a sparse 3D occupancy grid using Open3D's `VoxelBlockGrid` backed by a hash map. Each voxel is a 5cm cube by default.
 
+The robot's LiDAR sees a cone of space from its current position. Within that cone, any previously mapped voxels are now stale — the sensor has a fresh observation. By erasing entire Z-columns in the footprint, we guarantee:
+
+- No ghost obstacles from previous passes
+- Dynamic objects (people, doors) get cleared automatically
+- The latest observation always wins
+
+The hash map provides O(1) insert/erase/lookup, so this is efficient even with millions of voxels. The grid runs on **CUDA** by default for speed, with CPU fallback.
+
 ### How frames are added
 
 1. Incoming points are quantized to voxel coordinates: `vox = floor(point / voxel_size)`
@@ -86,32 +102,6 @@ _, found_mask = xy_hashmap.find(existing_xy)  # find overlapping columns
 self._voxel_hashmap.erase(existing[found_mask])  # erase old
 self._voxel_hashmap.activate(new_keys)            # insert new
 ```
-
-### Why column carving?
-
-The robot's LiDAR sees a cone of space from its current position. Within that cone, any previously mapped voxels are now stale — the sensor has a fresh observation. By erasing entire Z-columns in the footprint, we guarantee:
-
-- No ghost obstacles from previous passes
-- Dynamic objects (people, doors) get cleared automatically
-- The latest observation always wins
-
-The hash map provides O(1) insert/erase/lookup, so this is efficient even with millions of voxels. The grid runs on **CUDA** by default for speed, with CPU fallback.
-
-## Cost Mapping
-
-The [`CostMapper`](/dimos/mapping/costmapper.py) converts the 3D voxel map into a 2D navigation grid. The default algorithm (`height_cost`) works as follows:
-
-1. **Height maps**: For each (X, Y) cell, find min and max Z across all voxels
-2. **Pass-under detection**: If the vertical gap exceeds `can_pass_under` (default 0.6m), the robot can fit underneath — use ground height instead of obstacle height
-3. **Slope analysis**: Apply Sobel filter to the height map to compute terrain gradient
-4. **Cost assignment**: `cost = (gradient × resolution / can_climb) × 100`, clamped to [0, 100]
-
-| Cost | Meaning |
-|------|---------|
-| 0 | Flat, easy to traverse |
-| 50 | Moderate slope (~7.5cm rise per cell) |
-| 100 | Steep or impassable (≥15cm rise per cell) |
-| -1 | Unknown (no observations) |
 
 ## Blueprint Composition
 
