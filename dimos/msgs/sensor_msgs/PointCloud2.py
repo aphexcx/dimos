@@ -651,6 +651,7 @@ class PointCloud2(Timestamped):
                 positions=points,
                 colors=point_colors,
             )
+
         elif mode == "boxes":
             box_size = size if size is not None else voxel_size
             half = box_size / 2

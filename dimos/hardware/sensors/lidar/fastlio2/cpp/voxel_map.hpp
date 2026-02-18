@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Efficient global voxel map using a hash map.
-// Supports O(1) insert/update, distance-based pruning, and
-// convex hull-based clearing for scan integration.
+// Pure data structure: O(1) insert/update, distance-based pruning,
+// and cloud export.  Integration strategies live in strategies/.
 
 #ifndef VOXEL_MAP_HPP_
 #define VOXEL_MAP_HPP_
@@ -11,11 +11,9 @@
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
-#include <vector>
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/surface/convex_hull.h>
 
 struct VoxelKey {
     int32_t x, y, z;
@@ -38,12 +36,12 @@ struct Voxel {
     uint32_t count;       // points merged into this voxel
 };
 
+using VoxelHashMap = std::unordered_map<VoxelKey, Voxel, VoxelKeyHash>;
+
 class VoxelMap {
 public:
-    explicit VoxelMap(float voxel_size, float max_range = 100.0f,
-                     float hull_margin = -1.0f)
-        : voxel_size_(voxel_size), max_range_(max_range),
-          hull_margin_(hull_margin >= 0 ? hull_margin : voxel_size) {
+    explicit VoxelMap(float voxel_size, float max_range = 100.0f)
+        : voxel_size_(voxel_size), max_range_(max_range) {
         map_.reserve(500000);
     }
 
@@ -73,116 +71,6 @@ public:
                 map_.emplace(key, Voxel{pt.x, pt.y, pt.z, pt.intensity, 1});
             }
         }
-    }
-
-    /// Clear all voxels inside the convex hull of the given cloud, then insert it.
-    /// Computes the 3D convex hull, extracts outward-facing facet planes, and
-    /// deletes any existing voxel whose centroid lies inside all half-planes.
-    template <typename PointT>
-    void hull_clear_and_insert(const typename pcl::PointCloud<PointT>::Ptr& cloud) {
-        if (!cloud || cloud->size() < 4) {
-            // Need at least 4 non-coplanar points for a 3D hull
-            insert<PointT>(cloud);
-            return;
-        }
-
-        // Compute 3D convex hull
-        pcl::ConvexHull<PointT> hull;
-        hull.setInputCloud(cloud);
-        hull.setDimension(3);
-
-        typename pcl::PointCloud<PointT>::Ptr hull_vertices(new pcl::PointCloud<PointT>());
-        std::vector<pcl::Vertices> hull_polygons;
-        hull.reconstruct(*hull_vertices, hull_polygons);
-
-        if (hull_polygons.empty() || hull_vertices->empty()) {
-            insert<PointT>(cloud);
-            return;
-        }
-
-        // Compute hull centroid for orienting normals outward
-        float cx = 0, cy = 0, cz = 0;
-        for (const auto& pt : hull_vertices->points) {
-            cx += pt.x; cy += pt.y; cz += pt.z;
-        }
-        float inv_n = 1.0f / static_cast<float>(hull_vertices->size());
-        cx *= inv_n; cy *= inv_n; cz *= inv_n;
-
-        // Extract facet planes: each polygon → outward normal + offset
-        struct Plane {
-            float nx, ny, nz, d;  // normal (outward) and dot(normal, vertex)
-        };
-
-        std::vector<Plane> planes;
-        planes.reserve(hull_polygons.size());
-
-        for (const auto& polygon : hull_polygons) {
-            if (polygon.vertices.size() < 3) continue;
-
-            const auto& p0 = hull_vertices->points[polygon.vertices[0]];
-            const auto& p1 = hull_vertices->points[polygon.vertices[1]];
-            const auto& p2 = hull_vertices->points[polygon.vertices[2]];
-
-            // Two edges from p0
-            float e1x = p1.x - p0.x, e1y = p1.y - p0.y, e1z = p1.z - p0.z;
-            float e2x = p2.x - p0.x, e2y = p2.y - p0.y, e2z = p2.z - p0.z;
-
-            // Cross product
-            float nx = e1y * e2z - e1z * e2y;
-            float ny = e1z * e2x - e1x * e2z;
-            float nz = e1x * e2y - e1y * e2x;
-
-            // Normalize
-            float len = std::sqrt(nx * nx + ny * ny + nz * nz);
-            if (len < 1e-10f) continue;
-            nx /= len;
-            ny /= len;
-            nz /= len;
-
-            // Ensure normal points outward (away from centroid)
-            float to_centroid_x = cx - p0.x;
-            float to_centroid_y = cy - p0.y;
-            float to_centroid_z = cz - p0.z;
-            if (nx * to_centroid_x + ny * to_centroid_y + nz * to_centroid_z > 0) {
-                nx = -nx; ny = -ny; nz = -nz;
-            }
-
-            planes.push_back({nx, ny, nz, nx * p0.x + ny * p0.y + nz * p0.z});
-        }
-
-        if (planes.empty()) {
-            insert<PointT>(cloud);
-            return;
-        }
-
-        // Delete voxels whose centroids are strictly inside the hull.
-        // Shrink inward by one voxel_size_ so boundary voxels (walls,
-        // surfaces the LiDAR hit) are preserved — only free space is cleared.
-        float margin = hull_margin_;
-        size_t cleared = 0;
-        for (auto it = map_.begin(); it != map_.end();) {
-            const auto& v = it->second;
-            bool inside = true;
-            for (const auto& pl : planes) {
-                if (pl.nx * v.x + pl.ny * v.y + pl.nz * v.z > pl.d - margin) {
-                    inside = false;
-                    break;
-                }
-            }
-            if (inside) {
-                it = map_.erase(it);
-                ++cleared;
-            } else {
-                ++it;
-            }
-        }
-
-        if (cleared > 0) {
-            printf("[voxel_map] hull_clear: %zu facets, cleared %zu voxels, map size %zu\n",
-                   planes.size(), cleared, map_.size());
-        }
-
-        insert<PointT>(cloud);
     }
 
     /// Remove voxels farther than max_range from the given position.
@@ -218,12 +106,17 @@ public:
     size_t size() const { return map_.size(); }
     void clear() { map_.clear(); }
     void set_max_range(float r) { max_range_ = r; }
+    float voxel_size() const { return voxel_size_; }
+    float max_range() const { return max_range_; }
+
+    /// Direct access to underlying map (for strategies).
+    VoxelHashMap& data() { return map_; }
+    const VoxelHashMap& data() const { return map_; }
 
 private:
-    std::unordered_map<VoxelKey, Voxel, VoxelKeyHash> map_;
+    VoxelHashMap map_;
     float voxel_size_;
     float max_range_;
-    float hull_margin_;
 };
 
 #endif

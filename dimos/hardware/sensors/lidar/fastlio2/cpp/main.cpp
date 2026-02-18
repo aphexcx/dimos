@@ -33,6 +33,8 @@
 #include "cloud_filter.hpp"
 #include "dimos_native_module.hpp"
 #include "voxel_map.hpp"
+#include "strategies/hull_clear.hpp"
+#include "strategies/raycast_clear.hpp"
 
 // dimos LCM message headers
 #include "geometry_msgs/Quaternion.hpp"
@@ -61,6 +63,8 @@ static FastLio* g_fastlio = nullptr;
 static std::string g_lidar_topic;
 static std::string g_odometry_topic;
 static std::string g_map_topic;
+static std::string g_raw_lidar_topic;
+static std::string g_premap_lidar_topic;
 static std::string g_frame_id = "map";
 static std::string g_child_frame_id = "body";
 static float g_frequency = 10.0f;
@@ -293,6 +297,8 @@ int main(int argc, char** argv) {
     g_lidar_topic = mod.has("lidar") ? mod.topic("lidar") : "";
     g_odometry_topic = mod.has("odometry") ? mod.topic("odometry") : "";
     g_map_topic = mod.has("global_map") ? mod.topic("global_map") : "";
+    g_raw_lidar_topic = mod.has("raw_lidar") ? mod.topic("raw_lidar") : "";
+    g_premap_lidar_topic = mod.has("premap_lidar") ? mod.topic("premap_lidar") : "";
 
     if (g_lidar_topic.empty() && g_odometry_topic.empty()) {
         fprintf(stderr, "Error: at least one of --lidar or --odometry is required\n");
@@ -324,12 +330,17 @@ int main(int argc, char** argv) {
     filter_cfg.sor_stddev = mod.arg_float("sor_stddev", 1.0f);
     float map_voxel_size = mod.arg_float("map_voxel_size", 0.1f);
     float map_max_range = mod.arg_float("map_max_range", 100.0f);
-    float map_hull_margin = mod.arg_float("map_hull_margin", -1.0f);
     float map_freq = mod.arg_float("map_freq", 0.0f);
-    CloudFilterConfig map_filter_cfg;
-    map_filter_cfg.voxel_size = map_voxel_size;
-    map_filter_cfg.sor_mean_k = mod.arg_int("map_sor_mean_k", 50);
-    map_filter_cfg.sor_stddev = mod.arg_float("map_sor_stddev", 0.5f);
+    std::string map_strategy = mod.arg("map_strategy", "hull_clear");
+
+    // Strategy-specific config
+    HullClearConfig hull_cfg;
+    hull_cfg.margin = mod.arg_float("hull_margin", -1.0f);
+
+    RaycastClearConfig raycast_cfg;
+    raycast_cfg.inflate_radius = mod.arg_float("raycast_inflate_radius", 0.0f);
+    raycast_cfg.end_margin = mod.arg_float("raycast_end_margin", -1.0f);
+    raycast_cfg.min_range = mod.arg_float("raycast_min_range", 0.5f);
 
     // SDK network ports (defaults from SdkPorts struct in livox_sdk_config.hpp)
     livox_common::SdkPorts ports;
@@ -418,12 +429,11 @@ int main(int argc, char** argv) {
     std::unique_ptr<VoxelMap> global_map;
     std::chrono::microseconds map_interval{0};
     auto last_map_cycle = std::chrono::steady_clock::now();
-    PointCloudXYZI::Ptr map_accum_cloud(new PointCloudXYZI());
-    int map_accum_frames = 0;
     double map_insert_time_sum = 0.0;
     int map_insert_count = 0;
     if (!g_map_topic.empty() && map_freq > 0.0f) {
-        global_map = std::make_unique<VoxelMap>(map_voxel_size, map_max_range, map_hull_margin);
+        global_map = std::make_unique<VoxelMap>(map_voxel_size, map_max_range);
+        printf("[fastlio2] map_strategy: %s\n", map_strategy.c_str());
         map_interval = std::chrono::microseconds(
             static_cast<int64_t>(1e6 / map_freq));
     }
@@ -477,6 +487,10 @@ int main(int argc, char** argv) {
 
             auto world_cloud = fast_lio.get_world_cloud();
             if (world_cloud && !world_cloud->empty()) {
+                // Debug: raw FAST-LIO output (before filtering)
+                if (!g_raw_lidar_topic.empty())
+                    publish_lidar(world_cloud, ts, g_raw_lidar_topic);
+
                 auto filtered = filter_cloud<PointType>(world_cloud, filter_cfg);
 
                 // Per-scan publish at pointcloud_freq
@@ -485,31 +499,37 @@ int main(int argc, char** argv) {
                     last_pc_publish = now;
                 }
 
-                // Global map: accumulate frames, hull-clear + insert + publish at map_freq
-                if (global_map) {
-                    *map_accum_cloud += *filtered;
-                    map_accum_frames++;
+                // Global map: strategy clear + insert + publish at map_freq
+                if (global_map && now - last_map_cycle >= map_interval) {
+                        // Debug: filtered cloud before insertion
+                        if (!g_premap_lidar_topic.empty())
+                            publish_lidar(filtered, ts, g_premap_lidar_topic);
 
-                    if (now - last_map_cycle >= map_interval) {
-                        auto map_cloud_filtered = filter_cloud<PointType>(map_accum_cloud, map_filter_cfg);
                         auto t0 = std::chrono::high_resolution_clock::now();
-                        global_map->hull_clear_and_insert<PointType>(map_cloud_filtered);
+                        if (map_strategy == "hull_clear") {
+                            hull_clear_and_insert<PointType>(*global_map, filtered, hull_cfg);
+                        } else if (map_strategy == "raycast") {
+                            raycast_clear_and_insert<PointType>(
+                                *global_map, filtered,
+                                static_cast<float>(pose[0]),
+                                static_cast<float>(pose[1]),
+                                static_cast<float>(pose[2]),
+                                raycast_cfg);
+                        } else {
+                            // Default: insert only (no clearing)
+                            global_map->insert<PointType>(filtered);
+                        }
                         auto t1 = std::chrono::high_resolution_clock::now();
 
                         double insert_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
                         map_insert_time_sum += insert_ms;
                         map_insert_count++;
 
-                        printf("[fastlio2] map insert: %d frames, %zu→%zu pts, %.1f ms (avg %.1f ms), map %zu voxels\n",
-                               map_accum_frames,
-                               map_accum_cloud->size(),
-                               map_cloud_filtered->size(),
+                        printf("[fastlio2] map insert: %zu pts, %.1f ms (avg %.1f ms), map %zu voxels\n",
+                               filtered->size(),
                                insert_ms,
                                map_insert_time_sum / map_insert_count,
                                global_map->size());
-
-                        map_accum_cloud->clear();
-                        map_accum_frames = 0;
 
                         global_map->prune(
                             static_cast<float>(pose[0]),
@@ -518,7 +538,6 @@ int main(int argc, char** argv) {
                         auto map_cloud = global_map->to_cloud<PointType>();
                         publish_lidar(map_cloud, ts, g_map_topic);
                         last_map_cycle = now;
-                    }
                 }
             }
 

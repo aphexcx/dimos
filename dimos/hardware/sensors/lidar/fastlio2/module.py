@@ -89,7 +89,17 @@ class FastLio2Config(NativeModuleConfig):
     map_freq: float = 0.0
     map_voxel_size: float = 0.1
     map_max_range: float = 100.0
-    map_hull_margin: float = 0.1  # hull inset margin; -1 = use map_voxel_size
+    map_strategy: str = "hull_clear"
+    map_sor_mean_k: int = 50
+    map_sor_stddev: float = 0.5
+
+    # Strategy: hull_clear
+    hull_margin: float = -1.0  # hull inset margin; -1 = use map_voxel_size
+
+    # Strategy: raycast
+    raycast_inflate_radius: float = 0.0
+    raycast_end_margin: float = -1.0  # -1 = use map_voxel_size
+    raycast_min_range: float = 0.5
 
     # FAST-LIO YAML config (relative to config/ dir, or absolute path)
     # C++ binary reads YAML directly via yaml-cpp
@@ -134,6 +144,8 @@ class FastLio2(NativeModule, perception.Lidar, perception.Odometry, mapping.Glob
     lidar: Out[PointCloud2]
     odometry: Out[Odometry]
     global_map: Out[PointCloud2]
+    raw_lidar: Out[PointCloud2]
+    premap_lidar: Out[PointCloud2]
 
 
 fastlio2_module = FastLio2.blueprint

@@ -17,7 +17,7 @@ from dimos.hardware.sensors.lidar.fastlio2.module import FastLio2
 from dimos.mapping.voxels import VoxelGridMapper
 from dimos.visualization.rerun.bridge import rerun_bridge
 
-voxel_size = 0.03
+voxel_size = 0.05
 
 mid360_fastlio = autoconnect(
     FastLio2.blueprint(voxel_size=voxel_size, map_voxel_size=voxel_size, map_freq=-1),
@@ -39,16 +39,37 @@ mid360_fastlio_voxels = autoconnect(
     ),
 ).global_config(n_dask_workers=3, robot_model="mid360_fastlio2_voxels")
 
-mid360_fastlio_voxels_native = autoconnect(
+mid360_fastlio_voxels_convex = autoconnect(
     FastLio2.blueprint(
         voxel_size=voxel_size,
         map_voxel_size=voxel_size,
         map_freq=5.0,
+        map_strategy="hull_clear",
     ),
     rerun_bridge(
         visual_override={
             "world/lidar": None,
             "world/global_map": lambda grid: grid.to_rerun(voxel_size=voxel_size, mode="boxes"),
+            "world/raw_lidar": lambda cloud: cloud.to_rerun(color=[255, 0, 0], mode="points"),
+            "world/premap_lidar": lambda cloud: cloud.to_rerun(mode="boxes"),
+        }
+    ),
+).global_config(n_dask_workers=2, robot_model="mid360_fastlio2")
+
+mid360_fastlio_voxels_raycast = autoconnect(
+    FastLio2.blueprint(
+        voxel_size=voxel_size,
+        map_voxel_size=voxel_size,
+        map_freq=2.0,
+        map_strategy="raycast",
+        raycast_inflate_radius=0.15,
+    ),
+    rerun_bridge(
+        visual_override={
+            "world/lidar": None,
+            "world/global_map": lambda grid: grid.to_rerun(voxel_size=voxel_size, mode="boxes"),
+            "world/raw_lidar": lambda cloud: cloud.to_rerun(color=[255, 0, 0], mode="points"),
+            "world/premap_lidar": lambda cloud: cloud.to_rerun(mode="boxes"),
         }
     ),
 ).global_config(n_dask_workers=2, robot_model="mid360_fastlio2")
