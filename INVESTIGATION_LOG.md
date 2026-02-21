@@ -63,8 +63,8 @@ It runs at **200Hz** — much faster than LiDAR (10Hz). The perception stack nee
 
 | Process | Binary | Host(s) | Description |
 |---|---|---|---|
-| **mac_bridge** | `mac_bridge.py` | GOS | rclpy (ROS2 Foxy) subscriber that forwards DDS topics over TCP:9731 to Mac. Subscribes to `/ODOM`, `/ALIGNED_POINTS`, `/IMU`, `/tf`, `/MOTION_INFO`. Runs as `user` (not root) — this is the cause of the GOS SHM permission bug. Systemd service: `dimos-mac-bridge.service`. |
-| **m20-relay** | `relay.main` | GOS | Browser-to-ROS2 bridge for Houdini teleop UI. Handles battery status, manual control. NOT involved in autonomy data flow. |
+| **mac_bridge** | `mac_bridge.py` | GOS | rclpy (ROS2 Foxy) subscriber that forwards DDS topics over TCP:9731 to Mac. Subscribes to `/ODOM`, `/ALIGNED_POINTS`, `/IMU`, `/tf`, `/MOTION_INFO`. Runs as `user`. Uses `SingleThreadedExecutor.spin()` in a daemon thread. Node NOT discoverable by other DDS participants (see Finding #21). Systemd service: `dimos-mac-bridge.service`. |
+| **m20-relay** | `relay.main` | GOS | Houdini relay — browser-to-ROS2 bridge for teleop UI. Uses rclpy with `spin_once()` polling. Subscribes to `/IMU`, `/BATTERY_DATA`, `/JOINTS_DATA_10HZ`, `/MOTION_INFO`. Publishes `/JOINTS_CMD`. Runs from `/opt/m20-relay-versions/venv/`. Node IS discoverable. Handles battery/motor telemetry, SDK mode, manual joint control. NOT involved in autonomy data flow. |
 
 ### Scheduling Summary
 
@@ -78,7 +78,7 @@ It runs at **200Hz** — much faster than LiDAR (10Hz). The perception stack nee
 | mac_bridge | all | SCHED_OTHER | 0 | **user** |
 | m20-relay | all | SCHED_OTHER | 0 | **user** |
 
-All Deep Robotics processes run as root. Sensor/perception processes run on CPUs 4-7 with real-time scheduling (SCHED_RR). Handler is the exception — CPUs 0-3 with normal scheduling. Our processes (mac_bridge, m20-relay) run as `user`, which causes the GOS SHM permission mismatch.
+All Deep Robotics processes run as root. Sensor/perception processes run on CPUs 4-7 with real-time scheduling (SCHED_RR). Handler is the exception — CPUs 0-3 with normal scheduling. Our processes (mac_bridge, m20-relay) run as `user`. Note: SHM permission mismatch was initially suspected as the GOS root cause but was **disproven** — the Houdini relay runs as user and receives DDS data fine (see Session 2 findings).
 
 ## Data Pipeline (expected)
 
@@ -382,8 +382,10 @@ Tailscale installed but only filters Tailscale CGNAT traffic (100.64.0.0/10). IN
 
 ## ROOT CAUSE ANALYSIS
 
-### Problem 1: GOS 0 Hz (all topics) — SOLVED
-**Root cause**: FastDDS SHM permission mismatch between root (rslidar/drdds) and user (mac_bridge/rclpy). FastDDS selects SHM transport, SHM fails silently, no UDP fallback.
+### Problem 1: GOS 0 Hz (all topics) — REVISED: NOT SHM permissions
+**Original theory**: FastDDS SHM permission mismatch between root (rslidar/drdds) and user (mac_bridge/rclpy). **DISPROVEN** — the Houdini relay runs as user and receives DDS data fine. Running mac_bridge as root also didn't help.
+
+**Revised root cause**: Our `dimos_mac_bridge` rclpy node is NOT being discovered by other DDS participants (doesn't appear in `ros2 node list`). The Houdini relay's `m20_relay` node IS discovered using identical rclpy on the same host. Difference may be in Python interpreter (venv vs system), spin model (spin_once polling vs executor.spin() in thread), or other environmental factors.
 
 ### Problem 2: NOS localization "lost" (no ODOM/ALIGNED_POINTS output) — PARTIALLY SOLVED
 **Root cause**: DDS IS delivering IMU to localization (monitor reports "IMU has new data input"). But localization's ALGORITHM counts 0 IMU per LiDAR frame. The issue is in the APPLICATION layer, not DDS transport.
@@ -490,37 +492,161 @@ Without IMU, LIO (Lidar-Inertial Odometry) cannot start at all — it needs both
 
 ---
 
-## RECOMMENDED ACTION PLAN (for when user returns)
+## Session 2: Fix Application Results (2026-02-21 ~17:09 CST)
+
+Applied Fix 1 and Fix 2. Results invalidated the GOS SHM permission theory.
+
+### Fix 1 Applied: mac_bridge → root (REVERTED — didn't help)
+
+Changed `User=user` → `User=root` in `dimos-mac-bridge.service`, restarted. Service came up as root (PID 8486).
+
+**Result**: No improvement. `dimos_mac_bridge` node still NOT visible in `ros2 node list`. mac_bridge creates its own SHM segment (`fastrtps_c7acc787efa686d4`, 557KB, root:root) but does NOT map rslidar's segments (53ca, 5b6a, 6a6c — 52MB each, root:root).
+
+Reverted to `User=user` since the relay works as user.
+
+### Fix 2 Applied: AOS service restart (DONE)
+
+```bash
+sudo systemctl restart yesense rsdriver lio_perception
+```
+
+All three services now active. Have not yet verified if lio_perception is producing output (need to wait 30s+ for rsdriver sleep, then check logs).
+
+### Key Finding #19: `ros2 topic list` Discovers Everything, `ros2 topic hz` Gets Zero
+
+```
+$ ros2 topic list   → 40+ topics visible (all hosts)
+$ ros2 topic hz /ALIGNED_POINTS → 0 (local GOS topic from rslidar!)
+$ ros2 topic hz /IMU → 0 (NOS topic)
+$ ros2 topic hz /ODOM → 0 (NOS topic)
+$ ros2 topic hz /MOTION_INFO → 0
+```
+
+Even with `FASTRTPS_DEFAULT_PROFILES_FILE=/opt/robot/fastdds.xml` set — still 0 data. DDS discovery protocol (participant/endpoint discovery) works across drdds↔rclpy. But actual data delivery does not.
+
+This applies to ALL rclpy tools including `ros2 topic hz` (which creates a temporary subscriber). Not specific to our mac_bridge.
+
+### Key Finding #20: Topic Endpoint Details
+
+From `ros2 topic info -v`:
+
+| Topic | Publisher | Type | Subscribers |
+|---|---|---|---|
+| `/ALIGNED_POINTS` | `_CREATED_BY_BARE_DDS_APP_` (rslidar GOS) | sensor_msgs/PointCloud2 | **0** — our mac_bridge NOT subscribed |
+| `/ODOM` | `_CREATED_BY_BARE_DDS_APP_` (handler NOS) | nav_msgs/Odometry | 1 (drdds process, not us) |
+| `/IMU` | `_CREATED_BY_BARE_DDS_APP_` (yesense NOS) | sensor_msgs/Imu | 2 (1 drdds + 1 `m20_relay`) |
+
+All drdds publishers appear as `_CREATED_BY_BARE_DDS_APP_` with no ROS2 namespace. QoS: RELIABLE, VOLATILE, AUTOMATIC liveliness. These should be compatible with rclpy default QoS.
+
+### Key Finding #21: `dimos_mac_bridge` Node Not Discoverable (CRITICAL)
+
+```
+$ ros2 node list
+/m20_relay          ← Houdini relay only; our node MISSING
+```
+
+Our mac_bridge (PID 8486/10102) IS running, logs "ROS adapter started: subscriptions active", but the DDS participant is NOT discovered by other nodes. This explains why data doesn't flow — the node is invisible.
+
+### Key Finding #22: Houdini Relay Uses rclpy AND IT WORKS
+
+The Houdini relay (`/opt/m20-relay-versions/venv/bin/python -m relay.main`) is a Python process that also uses rclpy:
+
+```python
+# From /opt/m20-relay-versions/v0.2.0/src/relay/ros_bridge.py
+import rclpy
+rclpy.init()
+self._node = rclpy.create_node("m20_relay")
+self._node.create_subscription(StdImu, "/IMU", self._std_imu_callback, 10)
+```
+
+It subscribes to: `/IMU` (sensor_msgs/Imu), `/BATTERY_DATA`, `/JOINTS_DATA_10HZ`, `/MOTION_INFO`.
+It publishes to: `/JOINTS_CMD`.
+Service client: `/SDK_MODE`.
+
+**The relay IS visible in `ros2 node list` and presumably receives data.** This proves rclpy↔drdds data flow IS possible on GOS.
+
+### Key Finding #23: FastRTPS Version
+
+Our mac_bridge loads `libfastrtps.so.2.1.4` (from `/opt/ros/foxy/lib/`). drdds uses FastRTPS/FastDDS 2.14 (built into drdds binaries). The relay likely uses the same Foxy FastRTPS since it's in a Python venv with system rclpy.
+
+### Key Finding #24: What Makes the Relay Work but Our Bridge Not?
+
+| Property | Houdini relay (works) | Our mac_bridge (broken) |
+|---|---|---|
+| User | user | user (after revert) |
+| Python | `/opt/m20-relay-versions/venv/bin/python` | `/usr/bin/python3` |
+| Spin model | `rclpy.spin_once(node, timeout=0.001)` polling in event loop | `SingleThreadedExecutor.spin()` in daemon thread |
+| QoS | Default (integer `10`) | Explicit `QoSProfile(RELIABLE, KEEP_LAST, VOLATILE, depth=10)` |
+| Node name | `m20_relay` | `dimos_mac_bridge` |
+| PYTHONPATH | venv site-packages | `/opt/ros/foxy/lib/python3.8/site-packages:/opt/drdds/lib/python3.8/site-packages` |
+| Discovered? | YES (`ros2 node list`) | **NO** |
+
+**Top hypotheses for why our node isn't discovered**:
+1. **Python interpreter difference**: The relay uses a venv Python that might have different rclpy/FastRTPS shared libs linked
+2. **SingleThreadedExecutor vs spin_once**: Maybe `spin()` in a daemon thread blocks discovery protocol responses
+3. **Environment/rclpy initialization**: The relay may have additional env vars or rclpy config from its venv
+4. **Two rclpy.init() in same process space**: Unlikely since they're separate PIDs, but worth checking
+
+### Next Investigation Steps
+
+1. **Verify relay receives data**: Check if the relay's telemetry output shows live IMU/battery/motion updates (128% CPU suggests active processing)
+2. **Check relay's Python/rclpy path**: `ldd` or `python -c "import rclpy; print(rclpy.__file__)"` from the relay's venv vs system python
+3. **Test minimal rclpy subscriber**: Write a 10-line Python script that does `rclpy.init()`, `create_node`, `create_subscription`, `spin_once` in a loop — identical to the relay's pattern — see if it receives data
+4. **Check relay's DDS SHM segments**: Does the relay map any of rslidar's or yesense's SHM segments?
+5. **Compare DDS participant GUIDs**: Our node might have a GUID collision or invalid participant announcement
+6. **Try mac_bridge with spin_once() instead of executor.spin()**: The relay's polling model might be the key difference
+
+---
+
+## RECOMMENDED ACTION PLAN (updated after Session 2)
 
 **Goal**: Get dimos on Mac receiving ODOM + ALIGNED_POINTS + IMU via mac_bridge for auto exploration testing.
 
-**Step 1** (GOS, highest confidence, 1 min):
-```bash
-ssh -J user@10.21.41.1 user@10.21.31.104
-echo "'" | sudo -S sed -i 's/User=user/User=root/' /etc/systemd/system/dimos-mac-bridge.service
-echo "'" | sudo -S systemctl daemon-reload
-echo "'" | sudo -S systemctl restart dimos-mac-bridge
-```
-This fixes the SHM permission mismatch and should immediately deliver `/LIDAR/POINTS` from GOS rslidar to mac_bridge.
+**The SHM permission theory (Fix 1: run as root) was wrong.** The Houdini relay runs as user and receives DDS data fine. The real issue is that our `dimos_mac_bridge` rclpy node is not being discovered by DDS, while the Houdini relay's `m20_relay` node IS discovered.
 
-**Step 2** (AOS, medium confidence, 2 min):
+**Step 1** (GOS, highest priority — diagnose why our node isn't discovered):
+```bash
+# 1a. Check relay's rclpy library path
+/opt/m20-relay-versions/venv/bin/python -c "import rclpy; print(rclpy.__file__)"
+/usr/bin/python3 -c "import rclpy; print(rclpy.__file__)"
+# If they differ, our mac_bridge might be using a broken rclpy
+
+# 1b. Minimal test: does a simple spin_once subscriber receive data?
+/usr/bin/python3 -c "
+import rclpy
+from sensor_msgs.msg import Imu
+rclpy.init()
+node = rclpy.create_node('test_sub')
+got = [False]
+def cb(msg): got[0] = True; print('GOT IMU')
+node.create_subscription(Imu, '/IMU', cb, 10)
+import time
+for _ in range(50):
+    rclpy.spin_once(node, timeout_sec=0.1)
+    if got[0]: break
+node.destroy_node()
+rclpy.shutdown()
+print('Result:', 'DATA' if got[0] else 'NO DATA')
+"
+# If this gets data, our mac_bridge's executor.spin() model is the problem
+# If no data, rclpy itself can't receive from drdds
+```
+
+**Step 2** (GOS — if Step 1 shows spin model matters, fix mac_bridge):
+Replace `SingleThreadedExecutor.spin()` in a daemon thread with `rclpy.spin_once()` polling in the main loop (matching the relay's working pattern).
+
+**Step 3** (AOS — verify lio_perception after restart):
+AOS services were already restarted. Wait 60s+ then check if lio_perception produces output:
 ```bash
 ssh user@10.21.41.1
-echo "'" | sudo -S systemctl restart yesense rsdriver lio_perception
-# Wait 60s for rsdriver sleep 30 + startup
-echo "'" | sudo -S journalctl -u lio_perception -n 30 --no-pager
-```
-Restart AOS services to re-trigger DDS discovery. If lio_perception gets IMU this time, it will produce `/LIO_ODOM` and `/LIO_ALIGNED_POINTS`.
-
-**Step 3** (verify on Mac):
-```bash
-# From Mac, with SSH tunnel already set up:
-python launch_m20_smart.py  # bridge_host="127.0.0.1"
-# Check rerun for ODOM, ALIGNED_POINTS, LIDAR data
+journalctl -u lio_perception -n 30 --no-pager
 ```
 
-**Step 4** (if Step 2 fails — NOS fallback):
-Try toggling `imu_use_system_time: true` in NOS localization config, or restart all NOS services. This is lower confidence since the issue appears to be in the localization binary's timestamp handling.
+**Step 4** (verify on Mac):
+Connect from Mac with SSH tunnel, check rerun for data streams.
 
-**Step 5** (if all else fails — bypass entirely):
-Write a simple drdds subscriber on GOS (Python 3.8 + drdds) that reads `/IMU` and `/LIDAR/POINTS` directly via drdds (same transport as rslidar/yesense), bypassing rclpy entirely.
+**Step 5** (if rclpy itself can't receive — bypass with drdds native):
+Write mac_bridge using drdds Python bindings directly instead of rclpy. This is the nuclear option but guaranteed to work since the relay's drdds subscriptions work.
+
+**Step 6** (NOS localization — low priority):
+NOS localization has a proprietary binary bug (timestamp mismatch). Can try `imu_use_system_time: true` or service restarts, but the pragmatic path is using AOS lio_perception output instead.
