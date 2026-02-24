@@ -40,7 +40,11 @@ from reactivex.observable import Observable
 from reactivex.subject import Subject
 
 from dimos.msgs.geometry_msgs import PoseStamped, Quaternion, Transform, Vector3
+from dimos.msgs.geometry_msgs.Pose import Pose
+from dimos.msgs.geometry_msgs.Twist import Twist as DimTwist
+from dimos.msgs.nav_msgs.Odometry import Odometry as DimosOdometry
 from dimos.msgs.sensor_msgs import PointCloud2 as DimosPointCloud2
+from dimos.msgs.sensor_msgs.Imu import Imu as DimosImu
 
 from .ros_sensors import MotionInfoData
 
@@ -172,8 +176,34 @@ def _decode_motion_info(payload: bytes) -> MotionInfoData:
     )
 
 
-def _decode_imu(payload: bytes) -> dict:
-    return json.loads(payload)
+def _decode_imu(payload: bytes) -> DimosImu:
+    d = json.loads(payload)
+    return DimosImu(
+        angular_velocity=Vector3(d["gx"], d["gy"], d["gz"]),
+        linear_acceleration=Vector3(d["ax"], d["ay"], d["az"]),
+        orientation=Quaternion(d["ox"], d["oy"], d["oz"], d["ow"]),
+        frame_id=d.get("frame_id", "imu_link"),
+        ts=d["ts"],
+    )
+
+
+def _decode_odometry(payload: bytes) -> DimosOdometry:
+    d = json.loads(payload)
+    pose = Pose(
+        position=[d["x"], d["y"], d["z"]],
+        orientation=[d["qx"], d["qy"], d["qz"], d["qw"]],
+    )
+    twist = DimTwist(
+        linear=[d.get("lx", 0), d.get("ly", 0), d.get("lz", 0)],
+        angular=[d.get("ax", 0), d.get("ay", 0), d.get("az", 0)],
+    )
+    return DimosOdometry(
+        ts=d["ts"],
+        frame_id=d.get("frame_id", "odom"),
+        child_frame_id=d.get("child_frame_id", "base_link"),
+        pose=pose,
+        twist=twist,
+    )
 
 
 class M20MacBridgeClient:
@@ -205,9 +235,10 @@ class M20MacBridgeClient:
 
         # Observable subjects
         self._odom_subject: Subject[PoseStamped] = Subject()
+        self._odometry_subject: Subject[DimosOdometry] = Subject()
         self._tf_subject: Subject[list[Transform]] = Subject()
         self._lidar_subject: Subject[DimosPointCloud2] = Subject()
-        self._imu_subject: Subject[Any] = Subject()
+        self._imu_subject: Subject[DimosImu] = Subject()
         self._motion_info_subject: Subject[MotionInfoData] = Subject()
 
     def start(self) -> None:
@@ -254,13 +285,16 @@ class M20MacBridgeClient:
     def odom_stream(self) -> Observable[PoseStamped]:
         return self._odom_subject
 
+    def odometry_stream(self) -> Observable[DimosOdometry]:
+        return self._odometry_subject
+
     def tf_stream(self) -> Observable[list[Transform]]:
         return self._tf_subject
 
     def lidar_stream(self) -> Observable[DimosPointCloud2]:
         return self._lidar_subject
 
-    def imu_stream(self) -> Observable[Any]:
+    def imu_stream(self) -> Observable[DimosImu]:
         return self._imu_subject
 
     def motion_info_stream(self) -> Observable[MotionInfoData]:
@@ -350,6 +384,7 @@ class M20MacBridgeClient:
         try:
             if msg_type == MSG_ODOM:
                 self._odom_subject.on_next(_decode_odom(payload))
+                self._odometry_subject.on_next(_decode_odometry(payload))
             elif msg_type == MSG_TF:
                 self._tf_subject.on_next(_decode_tf(payload))
             elif msg_type == MSG_LIDAR:

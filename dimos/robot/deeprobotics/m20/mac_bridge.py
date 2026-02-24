@@ -425,12 +425,17 @@ class M20MacBridge(object):
             p = msg.pose.pose.position
             q = msg.pose.pose.orientation
             stamp = msg.header.stamp
+            lv = msg.twist.twist.linear
+            av = msg.twist.twist.angular
             data = {
                 "x": float(p.x), "y": float(p.y), "z": float(p.z),
                 "qx": float(q.x), "qy": float(q.y),
                 "qz": float(q.z), "qw": float(q.w),
                 "ts": float(stamp.sec) + float(stamp.nanosec) * 1e-9,
                 "frame_id": msg.header.frame_id or "odom",
+                "child_frame_id": msg.child_frame_id or "base_link",
+                "lx": float(lv.x), "ly": float(lv.y), "lz": float(lv.z),
+                "ax": float(av.x), "ay": float(av.y), "az": float(av.z),
             }
             self._buffer_frame(MSG_ODOM, json.dumps(data).encode("utf-8"))
         except Exception:
@@ -531,6 +536,7 @@ class M20MacBridge(object):
                 "ox": float(o.x), "oy": float(o.y),
                 "oz": float(o.z), "ow": float(o.w),
                 "ts": float(stamp.sec) + float(stamp.nanosec) * 1e-9,
+                "frame_id": msg.header.frame_id or "imu_link",
             }
             self._buffer_frame(MSG_IMU, json.dumps(data).encode("utf-8"))
         except Exception:

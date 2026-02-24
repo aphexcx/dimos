@@ -47,7 +47,10 @@ from dimos.msgs.geometry_msgs import (
     Twist,
     Vector3,
 )
+from dimos.msgs.nav_msgs.Odometry import Odometry as OdometryMsg
 from dimos.msgs.sensor_msgs import CameraInfo, Image, PointCloud2
+from dimos.msgs.sensor_msgs.Imu import Imu
+from dimos.spec.perception import IMU as IMUSpec, Lidar as LidarSpec, Odometry as OdometrySpec
 
 from ..protocol import (
     GaitType,
@@ -83,7 +86,7 @@ except (ImportError, RuntimeError):
 logger = logging.getLogger(__name__)
 
 
-class M20Connection(Module, spec.Camera, spec.Pointcloud):
+class M20Connection(Module, spec.Camera, spec.Pointcloud, LidarSpec, IMUSpec, OdometrySpec):
     """Deep Robotics M20 quadruped connection.
 
     When rclpy is available (GOS), operates in Navigation Mode with
@@ -97,7 +100,9 @@ class M20Connection(Module, spec.Camera, spec.Pointcloud):
         camera_info (Out): Camera intrinsics
         pointcloud (Out):  Processed point cloud (alias for lidar)
         lidar (Out):       Raw LiDAR point cloud
-        odom (Out):        Robot odometry pose
+        odom (Out):        Robot odometry pose (PoseStamped)
+        odometry (Out):    Full odometry with twist and covariance
+        imu (Out):         IMU sensor data (angular velocity, acceleration, orientation)
     """
 
     # Input streams
@@ -110,8 +115,16 @@ class M20Connection(Module, spec.Camera, spec.Pointcloud):
     # Output streams (spec.Pointcloud)
     pointcloud: Out[PointCloud2]
 
-    # Additional output streams
+    # Output streams (spec.Lidar)
     lidar: Out[PointCloud2]
+
+    # Output streams (spec.Odometry)
+    odometry: Out[OdometryMsg]
+
+    # Output streams (spec.IMU)
+    imu: Out[Imu]
+
+    # Legacy output (kept for TF publishing compatibility)
     odom: Out[PoseStamped]
 
     # Internal state
@@ -286,12 +299,26 @@ class M20Connection(Module, spec.Camera, spec.Pointcloud):
             self._ros_sensors.odom_stream().subscribe(self._publish_tf)
         )
 
+        # Wire /ODOM → full odometry stream (with twist + covariance)
+        self._disposables.add(
+            self._ros_sensors.odometry_stream().subscribe(
+                lambda odom: self.odometry.publish(odom)
+            )
+        )
+
         # Wire /ALIGNED_POINTS → lidar + pointcloud streams
         self._disposables.add(
             self._ros_sensors.lidar_stream().subscribe(_on_lidar)
         )
 
-        logger.info("ROS sensor path active: /ODOM, /tf, /ALIGNED_POINTS, /NAV_CMD")
+        # Wire /IMU → imu stream
+        self._disposables.add(
+            self._ros_sensors.imu_stream().subscribe(
+                lambda imu_msg: self.imu.publish(imu_msg)
+            )
+        )
+
+        logger.info("ROS sensor path active: /ODOM, /tf, /ALIGNED_POINTS, /IMU, /NAV_CMD")
 
     def _start_udp_fallback_path(self) -> None:
         """Start UDP-only fallback path (Regular Mode)."""
