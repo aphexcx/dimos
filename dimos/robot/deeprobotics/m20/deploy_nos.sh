@@ -20,7 +20,14 @@
 #   Mac bridge deploy (--mac-bridge, default):
 #     1. Copies mac_bridge.py to /opt/dimos/ on NOS
 #     2. Installs systemd service (dimos-mac-bridge)
-#     3. Starts the bridge service
+#     3. Restarts lio_perception on AOS and waits for lio_command to succeed
+#     4. Starts the bridge service
+#
+#   IMPORTANT: The bridge's DDS participant interferes with lio_command on AOS.
+#   lio must be enabled BEFORE the bridge starts. The script handles this
+#   automatically, but if you manually restart services, use this order:
+#     1. sudo systemctl restart lio_perception   (on AOS, wait for 调用成功)
+#     2. sudo systemctl restart dimos-mac-bridge  (on NOS)
 #
 # Network path: Mac → AOS WiFi (10.21.41.1:9731) → DNAT → NOS (10.21.31.106:9731)
 # NOS DDS: eth0 (10.21.33.106) shares L2 with AOS eth0 (10.21.33.103)
@@ -49,13 +56,10 @@ set -- "${POSITIONAL[@]}"
 NOS_HOST="${1:-10.21.31.106}"
 NOS_USER="${2:-user}"
 JUMP_HOST="${JUMP_HOST:-user@10.21.41.1}"
+AOS_HOST="${JUMP_HOST}"  # AOS is the jump host itself
 DEPLOY_DIR="/opt/dimos"
 VENV_DIR="${DEPLOY_DIR}/venv"
 SSH_OPTS="-o ProxyJump=${JUMP_HOST}"
-
-# Backwards compat aliases
-GOS_HOST="${NOS_HOST}"
-GOS_USER="${NOS_USER}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # dimos root is 4 levels up from m20/ directory
@@ -95,6 +99,74 @@ remote_sudo() {
 
 remote_ssh() {
     ssh ${SSH_OPTS} "${NOS_USER}@${NOS_HOST}" "$@"
+}
+
+aos_sudo() {
+    printf '%s\n' "${SUDO_PASS}" | ssh "${AOS_HOST}" "sudo -S $*" 2>&1 | { grep -v '^\[sudo\] password' || true; }
+}
+
+aos_ssh() {
+    ssh "${AOS_HOST}" "$@"
+}
+
+lio_publishing_data() {
+    # Verify lio is actually publishing /ODOM by checking on NOS (shared L2).
+    # Uses ros2 topic echo with a short timeout — returns 0 if data received.
+    remote_ssh "source /opt/ros/foxy/setup.bash && \
+        export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
+        timeout 5 ros2 topic echo /ODOM --once" >/dev/null 2>&1
+}
+
+ensure_lio_enabled() {
+    # The NOS bridge's DDS participant interferes with lio_command's service
+    # call on AOS. We must ensure lio is enabled BEFORE starting the bridge.
+    #
+    # Health check (3 signals):
+    #   1. lio_ddsnode process running on AOS
+    #   2. lio_command process NOT running (enable sequence completed)
+    #   3. /ODOM topic has data flowing (verified from NOS over shared L2)
+    echo "Ensuring lio_perception is enabled on AOS..."
+
+    # Fast path: already running, enable finished, and publishing data
+    if aos_ssh "pgrep -f lio_ddsnode" >/dev/null 2>&1 && \
+       ! aos_ssh "pgrep -f 'lio_command 1'" >/dev/null 2>&1; then
+        echo "  lio_ddsnode running, lio_command finished — checking data flow..."
+        if lio_publishing_data; then
+            echo "  /ODOM data confirmed — lio is healthy"
+            return 0
+        fi
+        echo "  No /ODOM data — lio_command may have failed, restarting..."
+    elif aos_ssh "pgrep -f 'lio_command 1'" >/dev/null 2>&1; then
+        echo "  lio_command still in progress — waiting..."
+    else
+        echo "  lio_ddsnode not running — starting lio_perception..."
+    fi
+
+    # (Re)start lio_perception
+    aos_sudo systemctl restart lio_perception
+
+    # Wait for lio_command to finish and data to flow (up to 45s)
+    local max_wait=45
+    local elapsed=0
+    while [ $elapsed -lt $max_wait ]; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        # First wait for lio_command to exit
+        if aos_ssh "pgrep -f 'lio_command 1'" >/dev/null 2>&1; then
+            echo "  Waiting for lio_command... (${elapsed}s)"
+            continue
+        fi
+        # Then verify data is flowing
+        if lio_publishing_data; then
+            echo "  /ODOM data confirmed (${elapsed}s) — lio is healthy"
+            return 0
+        fi
+        echo "  lio_command finished but no /ODOM data yet... (${elapsed}s)"
+    done
+
+    echo "  WARNING: lio not confirmed healthy after ${max_wait}s"
+    echo "  The bridge will start anyway — check lio_perception manually."
+    return 0
 }
 
 # Verify sudo
@@ -160,6 +232,9 @@ SERVICE_EOF
     remote_sudo mv /tmp/dimos-mac-bridge.service /etc/systemd/system/dimos-mac-bridge.service
     remote_sudo systemctl daemon-reload
     remote_sudo systemctl enable dimos-mac-bridge
+
+    # Ensure lio is enabled before starting bridge (DDS participant conflict)
+    ensure_lio_enabled
 
     # Start service
     echo "Starting Mac bridge service..."

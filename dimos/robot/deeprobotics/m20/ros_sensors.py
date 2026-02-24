@@ -38,7 +38,13 @@ from reactivex.observable import Observable
 from reactivex.subject import Subject
 
 from dimos.msgs.geometry_msgs import PoseStamped, Quaternion, Transform, Vector3
+from dimos.msgs.geometry_msgs.Pose import Pose
+from dimos.msgs.geometry_msgs.PoseWithCovariance import PoseWithCovariance
+from dimos.msgs.geometry_msgs.Twist import Twist as DimTwist
+from dimos.msgs.geometry_msgs.TwistWithCovariance import TwistWithCovariance
+from dimos.msgs.nav_msgs.Odometry import Odometry as DimosOdometry
 from dimos.msgs.sensor_msgs import PointCloud2 as DimosPointCloud2
+from dimos.msgs.sensor_msgs.Imu import Imu as DimosImu
 from dimos.protocol.pubsub.impl.rospubsub import ROS_AVAILABLE, RawROS, RawROSTopic
 
 # QoS import — only available when rclpy is installed
@@ -106,6 +112,48 @@ def _odom_to_pose_stamped(odom_msg: Any) -> PoseStamped:
         position=Vector3(p.x, p.y, p.z),
         orientation=Quaternion(q.x, q.y, q.z, q.w),
         frame_id=odom_msg.header.frame_id or "odom",
+        ts=stamp.sec + stamp.nanosec * 1e-9,
+    )
+
+
+def _ros_odom_to_dimos(odom_msg: Any) -> DimosOdometry:
+    """Convert nav_msgs/Odometry to dimos Odometry (full, with twist + covariance)."""
+    p = odom_msg.pose.pose.position
+    q = odom_msg.pose.pose.orientation
+    stamp = odom_msg.header.stamp
+    pose = Pose(
+        position=[p.x, p.y, p.z],
+        orientation=[q.x, q.y, q.z, q.w],
+    )
+    lv = odom_msg.twist.twist.linear
+    av = odom_msg.twist.twist.angular
+    twist = DimTwist(
+        linear=[lv.x, lv.y, lv.z],
+        angular=[av.x, av.y, av.z],
+    )
+    return DimosOdometry(
+        ts=stamp.sec + stamp.nanosec * 1e-9,
+        frame_id=odom_msg.header.frame_id or "odom",
+        child_frame_id=odom_msg.child_frame_id or "base_link",
+        pose=PoseWithCovariance(pose, list(odom_msg.pose.covariance)),
+        twist=TwistWithCovariance(twist, list(odom_msg.twist.covariance)),
+    )
+
+
+def _ros_imu_to_dimos(msg: Any) -> DimosImu:
+    """Convert sensor_msgs/Imu to dimos Imu."""
+    a = msg.linear_acceleration
+    g = msg.angular_velocity
+    o = msg.orientation
+    stamp = msg.header.stamp
+    return DimosImu(
+        angular_velocity=Vector3(g.x, g.y, g.z),
+        linear_acceleration=Vector3(a.x, a.y, a.z),
+        orientation=Quaternion(o.x, o.y, o.z, o.w),
+        orientation_covariance=list(msg.orientation_covariance),
+        angular_velocity_covariance=list(msg.angular_velocity_covariance),
+        linear_acceleration_covariance=list(msg.linear_acceleration_covariance),
+        frame_id=msg.header.frame_id or "imu_link",
         ts=stamp.sec + stamp.nanosec * 1e-9,
     )
 
@@ -234,9 +282,10 @@ class M20ROSSensors:
 
         # Observable streams
         self._odom_subject: Subject[PoseStamped] = Subject()
+        self._odometry_subject: Subject[DimosOdometry] = Subject()
         self._tf_subject: Subject[list[Transform]] = Subject()
         self._lidar_subject: Subject[DimosPointCloud2] = Subject()
-        self._imu_subject: Subject[Any] = Subject()
+        self._imu_subject: Subject[DimosImu] = Subject()
         self._motion_info_subject: Subject[MotionInfoData] = Subject()
 
         # Unsubscribe handles
@@ -313,13 +362,16 @@ class M20ROSSensors:
     def odom_stream(self) -> Observable[PoseStamped]:
         return self._odom_subject
 
+    def odometry_stream(self) -> Observable[DimosOdometry]:
+        return self._odometry_subject
+
     def tf_stream(self) -> Observable[list[Transform]]:
         return self._tf_subject
 
     def lidar_stream(self) -> Observable[DimosPointCloud2]:
         return self._lidar_subject
 
-    def imu_stream(self) -> Observable[Any]:
+    def imu_stream(self) -> Observable[DimosImu]:
         return self._imu_subject
 
     def motion_info_stream(self) -> Observable[MotionInfoData]:
@@ -363,6 +415,8 @@ class M20ROSSensors:
         try:
             pose = _odom_to_pose_stamped(msg)
             self._odom_subject.on_next(pose)
+            odometry = _ros_odom_to_dimos(msg)
+            self._odometry_subject.on_next(odometry)
         except Exception:
             logger.exception("Error converting /ODOM message")
 
@@ -382,7 +436,8 @@ class M20ROSSensors:
 
     def _on_imu(self, msg: Any, _topic: RawROSTopic) -> None:
         try:
-            self._imu_subject.on_next(msg)
+            imu = _ros_imu_to_dimos(msg)
+            self._imu_subject.on_next(imu)
         except Exception:
             logger.exception("Error converting /IMU message")
 
