@@ -19,6 +19,10 @@
 
 set -e
 
+# Parse: first arg is command, optional second/third are host/user
+CMD="${1:-help}"
+shift 2>/dev/null || true
+
 # Configuration
 NOS_HOST="${1:-10.21.31.106}"
 NOS_USER="${2:-user}"
@@ -30,10 +34,6 @@ CONTAINER_NAME="dimos-m20"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIMOS_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
-
-# Shift past positional args to get command
-CMD="${1:-help}"
-shift 2>/dev/null || true
 
 # Prompt for sudo password
 if [ -z "${SUDO_PASS}" ]; then
@@ -252,7 +252,7 @@ case "${CMD}" in
         ;;
 
     *)
-        echo "Usage: $0 {build|start|stop|logs|shell|status} [hostname] [user]"
+        echo "Usage: $0 {build|start|stop|logs|shell|status} [hostname=$NOS_HOST] [user=$NOS_USER]"
         echo ""
         echo "Commands:"
         echo "  build   - Sync code + build Docker image on NOS"
