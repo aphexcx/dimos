@@ -15,7 +15,8 @@ import time
 
 from dimos.core.global_config import global_config
 
-global_config.update(viewer_backend="rerun-web")
+# Start with no viewer to reduce memory — enable rerun-web once basic stack verified
+global_config.update(viewer_backend="none")
 
 from dimos.core.blueprints import autoconnect
 from dimos.robot.deeprobotics.m20.blueprints.smart.m20_smart import m20_smart

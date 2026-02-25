@@ -15,6 +15,11 @@ export FASTRTPS_DEFAULT_PROFILES_FILE=/opt/dimos/docker/fastdds.xml
 # Ensure LD_LIBRARY_PATH includes ROS and drdds
 export LD_LIBRARY_PATH=/opt/ros/humble/lib:/opt/drdds/lib:${LD_LIBRARY_PATH}
 
+# LCM multicast configuration (required by dimos service layer)
+ip route add 224.0.0.0/4 dev lo 2>/dev/null || true
+sysctl -w net.core.rmem_max=67108864 2>/dev/null || true
+sysctl -w net.core.rmem_default=67108864 2>/dev/null || true
+
 # Wait for ROS2 topics before launching dimos (data flow verification)
 echo "Waiting for ROS2 topics..."
 for topic in /ODOM /IMU; do
