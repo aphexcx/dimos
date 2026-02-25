@@ -18,17 +18,31 @@ from dimos.core.global_config import global_config
 global_config.update(viewer_backend="rerun-web")
 
 from dimos.core.blueprints import autoconnect
-from dimos.robot.deeprobotics.m20.blueprints.smart.m20_smart import m20_smart
+from dimos.mapping.costmapper import cost_mapper
+from dimos.mapping.pointclouds.occupancy import HeightCostConfig
+from dimos.mapping.voxels import voxel_mapper
+from dimos.navigation.frontier_exploration import wavefront_frontier_explorer
+from dimos.navigation.replanning_a_star.module import replanning_a_star_planner
+from dimos.robot.deeprobotics.m20.blueprints.basic.m20_minimal import m20_minimal
 from dimos.robot.deeprobotics.m20.connection import m20_connection
 
 # Direct ROS2 mode: no bridge_host, robot_ip is AOS eth0 (shared L2 with NOS)
 AOS_ETH0 = "10.21.33.103"
 
+# Same as m20_smart but with publish_interval=1.0 — VoxelGridMapper on CPU
+# is expensive, Lesh recommended 1Hz instead of every-frame (~10Hz).
 bp = autoconnect(
-    m20_smart,
+    m20_minimal,
+    voxel_mapper(voxel_size=0.1, publish_interval=1.0),
+    cost_mapper(config=HeightCostConfig(max_height=1.5)),
+    replanning_a_star_planner(),
+    wavefront_frontier_explorer(),
     m20_connection(ip=AOS_ETH0, enable_ros=True),
 ).global_config(
     robot_ip=AOS_ETH0,
+    robot_model="deeprobotics_m20",
+    robot_width=0.3,
+    robot_rotation_diameter=0.6,
     n_dask_workers=3,  # 3 workers across 4 cores — avoids VoxelGridMapper blocking M20Connection
 )
 
