@@ -146,7 +146,7 @@ case "${CMD}" in
 
         # Verify base image exists
         echo "Checking base image..."
-        if ! remote_sudo docker images dimos/m20-humble-base:latest --format '{{.ID}}' | grep -q .; then
+        if ! remote_sudo docker images dimos/m20-humble-base:latest | grep -q 'm20-humble-base'; then
             echo "ERROR: Base image dimos/m20-humble-base:latest not found on NOS"
             echo "Load it first: sudo docker load -i /tmp/ysc_ros2_backup.tar.gz"
             echo "Then tag it:   sudo docker tag <IMAGE_ID> dimos/m20-humble-base:latest"
@@ -170,14 +170,22 @@ case "${CMD}" in
             --exclude '.beads' \
             --exclude '.runtime' \
             --exclude 'state.json' \
+            --exclude 'data' \
+            --exclude 'logs' \
+            --exclude 'docs' \
+            --exclude 'assets' \
+            --exclude '.claude' \
+            --exclude '.github' \
+            --exclude 'examples' \
+            --exclude 'mail' \
             "${DIMOS_ROOT}/" "${NOS_USER}@${NOS_HOST}:${DEPLOY_DIR}/"
 
         # Build image on NOS
         echo "Building Docker image on NOS (this may take a while on first build)..."
-        remote_ssh "cd ${DEPLOY_DIR} && sudo docker build \
+        remote_sudo docker build \
             -t dimos-m20-nos:latest \
-            -f dimos/robot/deeprobotics/m20/docker/Dockerfile \
-            ."
+            -f ${DEPLOY_DIR}/dimos/robot/deeprobotics/m20/docker/Dockerfile \
+            ${DEPLOY_DIR}
 
         echo ""
         echo "=== Build Complete ==="
@@ -205,7 +213,7 @@ case "${CMD}" in
         sleep 5
         echo ""
         echo "Container status:"
-        remote_sudo docker ps --filter name=${CONTAINER_NAME} --format 'table {{.Status}}\t{{.Names}}'
+        remote_sudo docker ps --filter name=${CONTAINER_NAME}
         echo ""
         echo "Access from Mac:"
         echo "  Web UI:  http://10.21.41.1:7779/command-center"
@@ -230,7 +238,7 @@ case "${CMD}" in
 
     status)
         echo "=== Container ==="
-        remote_sudo docker ps -a --filter name=${CONTAINER_NAME} --format 'table {{.Status}}\t{{.Names}}'
+        remote_sudo docker ps -a --filter name=${CONTAINER_NAME}
         echo ""
         echo "=== lio (AOS) ==="
         if aos_ssh "pgrep -f lio_ddsnode" >/dev/null 2>&1; then
