@@ -2133,6 +2133,7 @@ The M20 RTSP camera pipeline (H.265 1280x720@15fps) currently uses PyAV FFmpeg s
 - Test keyboard control, navigation, exploration
 - Investigate MPP hardware video decode (Step 3 from plan)
 - Consider building drdds Python bindings for Humble to enable /NAV_CMD
+- Commit pending changes
 
 ---
 
