@@ -12,20 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
+from dataclasses import dataclass
 
 from dimos_lcm.std_msgs import Bool, String
 from reactivex.disposable import Disposable
 
 from dimos.core import In, Module, Out, rpc
 from dimos.core.global_config import GlobalConfig, global_config
+from dimos.core.module import ModuleConfig
 from dimos.msgs.geometry_msgs import PoseStamped, Twist
 from dimos.msgs.nav_msgs import OccupancyGrid, Path
 from dimos.navigation.base import NavigationInterface, NavigationState
 from dimos.navigation.replanning_a_star.global_planner import GlobalPlanner
 
 
+@dataclass
+class Config(ModuleConfig):
+    max_linear_speed: float = 0.55               # Max linear velocity (m/s)
+    max_angular_speed: float = 0.55              # Max angular velocity (rad/s)
+    control_frequency: float = 10                # Command loop rate (Hz)
+    k_angular: float = 0.5                       # Proportional gain for yaw correction
+    rotation_threshold: float = math.radians(90) # Above: rotate in place. Below: drive+rotate
+
+    def __post_init__(self) -> None:
+        if self.max_linear_speed <= 0:
+            raise ValueError(f"max_linear_speed must be positive, got {self.max_linear_speed}")
+        if self.max_angular_speed <= 0:
+            raise ValueError(f"max_angular_speed must be positive, got {self.max_angular_speed}")
+        if self.control_frequency <= 0:
+            raise ValueError(f"control_frequency must be positive, got {self.control_frequency}")
+
+
 class ReplanningAStarPlanner(Module, NavigationInterface):
+    default_config = Config
+    config: Config
+
     odom: In[PoseStamped]  # TODO: Use TF.
     global_costmap: In[OccupancyGrid]
     goal_request: In[PoseStamped]
@@ -40,10 +63,10 @@ class ReplanningAStarPlanner(Module, NavigationInterface):
     _planner: GlobalPlanner
     _global_config: GlobalConfig
 
-    def __init__(self, cfg: GlobalConfig = global_config) -> None:
-        super().__init__()
+    def __init__(self, cfg: GlobalConfig = global_config, **kwargs: object) -> None:
+        super().__init__(**kwargs)
         self._global_config = cfg
-        self._planner = GlobalPlanner(self._global_config)
+        self._planner = GlobalPlanner(self._global_config, self.config)
 
     @rpc
     def start(self) -> None:

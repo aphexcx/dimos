@@ -9,6 +9,7 @@ Access from Mac:
   Rerun:   rerun --connect rerun+http://10.21.41.1:9876/proxy
 """
 
+import math
 import signal
 import sys
 import time
@@ -62,7 +63,13 @@ bp = autoconnect(
         max_height=0.7, resolution=0.05, ignore_noise=0.05, can_climb=0.25,
         smoothing=5.0,
     )),
-    replanning_a_star_planner(),
+    replanning_a_star_planner(
+        max_linear_speed=1.0,
+        max_angular_speed=1.2,
+        control_frequency=20,
+        k_angular=1.0,
+        rotation_threshold=math.radians(45),
+    ),
     wavefront_frontier_explorer(),
     m20_connection(ip=AOS_ETH0, enable_ros=True),
     rerun_bridge(

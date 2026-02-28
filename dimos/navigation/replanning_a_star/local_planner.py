@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 from threading import Event, RLock, Thread
 import time
@@ -63,14 +64,20 @@ class LocalPlanner(Resource):
     _goal_tolerance: float
     _controller: Controller
 
-    _speed: float = 0.55
-    _control_frequency: float = 10
     _orientation_tolerance: float = 0.35
     _navigation_costmap_interval: float = 1.0
     _navigation_costmap_last: float = 0.0
 
     def __init__(
-        self, global_config: GlobalConfig, navigation_map: NavigationMap, goal_tolerance: float
+        self,
+        global_config: GlobalConfig,
+        navigation_map: NavigationMap,
+        goal_tolerance: float,
+        max_linear_speed: float = 0.55,
+        max_angular_speed: float = 0.55,
+        control_frequency: float = 10,
+        k_angular: float = 0.5,
+        rotation_threshold: float = math.radians(90),
     ) -> None:
         self.cmd_vel = Subject()
         self.stopped_navigating = Subject()
@@ -84,11 +91,16 @@ class LocalPlanner(Resource):
         self._global_config = global_config
         self._navigation_map = navigation_map
         self._goal_tolerance = goal_tolerance
+        self._max_linear_speed = max_linear_speed
+        self._control_frequency = control_frequency
 
         self._controller = PController(
             self._global_config,
-            self._speed,
+            self._max_linear_speed,
             self._control_frequency,
+            max_angular_speed=max_angular_speed,
+            k_angular=k_angular,
+            rotation_threshold=rotation_threshold,
         )
 
     def start(self) -> None:

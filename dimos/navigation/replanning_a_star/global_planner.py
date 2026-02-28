@@ -69,14 +69,26 @@ class GlobalPlanner(Resource):
     _stuck_time_window: float = 8.0
     _max_path_deviation: float = 0.9
 
-    def __init__(self, global_config: GlobalConfig) -> None:
+    def __init__(
+        self,
+        global_config: GlobalConfig,
+        planner_config: object | None = None,
+    ) -> None:
         self.path = Subject()
         self.goal_reached = Subject()
 
         self._global_config = global_config
         self._navigation_map = NavigationMap(self._global_config)
+
+        # Thread planner config fields to LocalPlanner → PController
+        lp_kwargs: dict[str, object] = {}
+        if planner_config is not None:
+            for field in ("max_linear_speed", "max_angular_speed", "control_frequency",
+                          "k_angular", "rotation_threshold"):
+                lp_kwargs[field] = getattr(planner_config, field)
+
         self._local_planner = LocalPlanner(
-            self._global_config, self._navigation_map, self._goal_tolerance
+            self._global_config, self._navigation_map, self._goal_tolerance, **lp_kwargs
         )
         self._position_tracker = PositionTracker(self._stuck_time_window)
         self._replan_limiter = ReplanLimiter()
