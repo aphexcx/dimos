@@ -14,8 +14,6 @@ import signal
 import sys
 import time
 
-import dask
-
 from dimos.core.global_config import global_config
 
 # Disable default rerun bridge from m20_minimal — we configure our own below
@@ -50,7 +48,7 @@ AOS_ETH0 = "10.21.33.103"
 #   over ~15cm, so 20cm is a reasonable lethal threshold.
 # - smoothing=1.5: More gap-filling between sparse ground observations.
 # - memory_limit="512MB": Caps Rerun recording memory. Won't retain full history
-#   but draws current state. Prevents Rerun from eating all Dask worker memory.
+#   but draws current state. Prevents Rerun from eating all worker memory.
 #   Lesh: "limit it to something small and it won't remember the history for you
 #   but it will draw the current state."
 # - global_map visual_override: Render voxels as 3D boxes (not flat sprites).
@@ -93,22 +91,11 @@ bp = autoconnect(
     robot_model="deeprobotics_m20",
     robot_width=0.3,
     robot_rotation_diameter=0.6,
-    n_dask_workers=2,
-    memory_limit="7GB",
+    n_workers=2,
 )
 
 
 def main():
-    # Dask memory management: spill/pause but NEVER terminate workers.
-    # Terminating kills the Rerun gRPC server (runs in-worker, doesn't respawn).
-    # With sshd OOM-protected and 4GB swap, it's safer to swap than lose Rerun.
-    dask.config.set({
-        "distributed.worker.memory.target": 0.7,
-        "distributed.worker.memory.spill": 0.8,
-        "distributed.worker.memory.pause": 0.9,
-        "distributed.worker.memory.terminate": False,
-    })
-
     print("Starting dimos M20 on NOS (direct ROS2 mode)...")
     coordinator = bp.build()
     print("dimos running!")

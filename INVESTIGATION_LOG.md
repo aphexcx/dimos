@@ -2569,3 +2569,100 @@ Added `visual_override` for voxel rendering (per Lesh):
 | Rerun memory | **CAPPED at 512MB** | Container RAM 3.7 GiB (was 6+) |
 | Exploration | **WORKING** | Robot navigating hallways |
 | Next tuning | Local planner | Lesh says rotation is slow, needs to be more aggressive |
+
+---
+
+## Session 20: Local Planner Tuning + Config Dataclass (Mar 2)
+
+### Problem
+
+Lesh: "try and tune the local planner to be more aggressive, seems a bit slow with rotation." The M20 halted and rotated slowly in place during exploration. All planner parameters were hardcoded class attributes — no way to configure per-robot without monkey-patching.
+
+### Root Cause
+
+| Parameter | Default | Effect |
+|---|---|---|
+| `_speed` | 0.55 m/s | Capped BOTH linear AND angular velocity |
+| `_k_angular` | 0.5 | Proportional gain for yaw correction |
+| `_rotation_threshold` | 90° | Above: rotate in place. Below: drive+rotate |
+| `_control_frequency` | 10 Hz | Command loop rate |
+
+The 90° rotation threshold was the biggest culprit — the robot stopped and rotated in place for any heading error > 90°. At 0.55 m/s with k_angular=0.5, even smaller corrections felt sluggish. Additionally, `_speed` was used as the cap for both linear and angular velocity, preventing independent tuning.
+
+### Solution: Config Dataclass
+
+Added `Config(ModuleConfig)` dataclass to `ReplanningAStarPlanner`, following the same pattern as `VoxelGridMapper`. This makes planner parameters configurable through blueprint kwargs — no monkey-patching needed.
+
+**Files modified:**
+- `module.py` — Added Config dataclass with 5 fields + `__post_init__` validation
+- `controllers.py` — Renamed `_speed` → `_max_linear_speed`, added `_max_angular_speed`, decoupled angular clip
+- `local_planner.py` — Accept config params in `__init__`, forward to PController
+- `global_planner.py` — Accept config via `planner_config: object | None`, forward fields to LocalPlanner using `dataclass_fields` introspection (avoids circular import with module.py)
+- `launch_nos.py` — Pass M20-specific tuning values through blueprint
+
+**Circular import avoidance**: `module.py` imports `GlobalPlanner` from `global_planner.py`, so `global_planner.py` cannot import `Config` from `module.py`. Solved with `planner_config: object | None = None` type hint + `dataclass_fields` introspection to auto-forward all non-inherited fields.
+
+### M20 Tuning Values
+
+```python
+replanning_a_star_planner(
+    max_linear_speed=1.0,      # was 0.55 — 50% of M20's 2 m/s safe max
+    max_angular_speed=1.2,     # was 0.55 (coupled) — ~69°/s independent rotation
+    control_frequency=20,      # was 10 — 2x faster command loop
+    k_angular=1.0,             # was 0.5 — 2x faster rotation response
+    rotation_threshold=math.radians(45),  # was 90° — drive while correcting up to 45°
+)
+```
+
+### Backward Compatibility
+
+- `replanning_a_star_planner()` with zero args behaves identically — all Config defaults match original hardcoded values
+- `cfg` param name preserved — blueprint `GlobalConfig` injection continues to work
+- Internal rename `_speed` → `_max_linear_speed` is purely internal
+
+### Reviews
+
+Three independent reviews confirmed the implementation:
+- **Code reviewer agent**: All `_speed` refs renamed (0 stale matches), blueprint kwargs chain verified
+- **Silent failure hunter**: Found two issues, both fixed:
+  1. Manually-maintained field tuple → replaced with `dataclass_fields` introspection
+  2. Missing k_angular/rotation_threshold validation → added to `__post_init__`
+- **Codex CLI (gpt-5.3-codex)**: All 4 checks passed (rename coverage, circular import avoidance, backward compatibility, no bugs). Noted pre-existing `_apply_min_velocity()` can exceed speed caps if max is set below 0.2 m/s — not a concern at our settings.
+
+### Deploy Fix: entrypoint.sh Permission
+
+`deploy.sh dev` (rsync + docker cp) stripped execute permission from `entrypoint.sh`, causing container restart failure:
+```
+exec: "/opt/dimos/entrypoint.sh": permission denied
+```
+**Fix**: Added `docker exec chmod +x` after `docker cp` in deploy.sh. Also added `node_modules` to rsync excludes (was syncing thousands of unnecessary files).
+
+### AOS NAT Rules (Persistent)
+
+Previous NAT rules for port forwarding (Mac → AOS → NOS) were lost on reboot. Fixed by:
+1. Adding DNAT + MASQUERADE + FORWARD rules for ports 7779 (Web UI) and 9876 (Rerun)
+2. Saving with `iptables-save > /etc/iptables/rules.v4`
+3. `netfilter-persistent` (already installed) restores on boot
+
+Currently forwarded ports:
+| Port | Service | Persisted |
+|------|---------|-----------|
+| 7779 | Command Center Web UI | Yes |
+| 9876 | Rerun gRPC proxy | Yes |
+| 9731 | (existing) | Yes |
+
+### Commits
+
+- `eec2c13ee` — Add Config dataclass to ReplanningAStarPlanner + tune M20 planner
+- `000c4ca47` — Address review findings: dataclass introspection + validation
+
+### Current State (Mar 2)
+
+| Component | Status | Notes |
+|---|---|---|
+| Planner Config | **DEPLOYED** | Config dataclass live on robot, tuned for M20 |
+| Speed decoupling | **DONE** | Separate linear (1.0) and angular (1.2) caps |
+| Rotation | **TUNED** | 45° threshold, k_angular=1.0, 20Hz loop |
+| NAT rules | **PERSISTENT** | Saved to /etc/iptables/rules.v4 |
+| Deploy script | **FIXED** | chmod entrypoint after docker cp, exclude node_modules |
+| Next | Test behavior | Observe rotation speed + path following with new tuning |

@@ -36,7 +36,7 @@ m20_smart = autoconnect(
     replanning_a_star_planner(),
     wavefront_frontier_explorer(),
 ).global_config(
-    n_dask_workers=6,
+    n_workers=6,
     robot_model="deeprobotics_m20",
     robot_width=0.3,
     robot_rotation_diameter=0.6,

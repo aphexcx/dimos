@@ -114,6 +114,7 @@ RSYNC_EXCLUDES=(
     --exclude '.github'
     --exclude 'examples'
     --exclude 'mail'
+    --exclude 'node_modules'
 )
 
 sync_source() {
@@ -282,6 +283,9 @@ case "${CMD}" in
         remote_ssh docker cp ${DEPLOY_DIR}/dimos/robot/deeprobotics/m20/docker/launch_nos.py ${CONTAINER_NAME}:/opt/dimos/launch_nos.py
         remote_ssh docker cp ${DEPLOY_DIR}/dimos/robot/deeprobotics/m20/docker/entrypoint.sh ${CONTAINER_NAME}:/opt/dimos/entrypoint.sh
         remote_ssh docker cp ${DEPLOY_DIR}/dimos/robot/deeprobotics/m20/docker/fastdds.xml ${CONTAINER_NAME}:/opt/dimos/docker/fastdds.xml
+
+        # docker cp doesn't always preserve execute bits from rsync'd files
+        remote_ssh docker exec ${CONTAINER_NAME} chmod +x /opt/dimos/entrypoint.sh
 
         echo "Restarting container..."
         remote_ssh docker restart ${CONTAINER_NAME}

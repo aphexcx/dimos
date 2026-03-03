@@ -29,7 +29,7 @@ m20_agentic = autoconnect(
     m20_skills(),
     agent(),
 ).global_config(
-    n_dask_workers=8,
+    n_workers=8,
     robot_model="deeprobotics_m20",
 )
 
