@@ -74,3 +74,4 @@ CLAUDE.MD
 /assets/teleop_certs/
 
 /.mcp.json
+*.speedscope.json
