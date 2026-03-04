@@ -2666,3 +2666,62 @@ Currently forwarded ports:
 | NAT rules | **PERSISTENT** | Saved to /etc/iptables/rules.v4 |
 | Deploy script | **FIXED** | chmod entrypoint after docker cp, exclude node_modules |
 | Next | Test behavior | Observe rotation speed + path following with new tuning |
+
+---
+
+## Session 19: Upstream Merge + Fix Breakage (Mar 4)
+
+### What Happened
+
+Merged latest `origin/dev` (11 commits) into `feature/m20-integration`. The merge itself was clean
+(1 conflict in wavefront frontier explorer), but the upstream introduced a **ModuleConfig → Pydantic
+migration** that broke module initialization across the board.
+
+### Root Causes
+
+**1. ModuleConfig now extends Pydantic BaseModel**
+- `ModuleConfig(BaseConfig)` where `BaseConfig(BaseModel)` (was plain class before)
+- Worker calls `module_class(global_config, **kwargs)` — `global_config` is positional arg 1
+- Any module with old `__init__` signature (custom param first) gets `GlobalConfig` in wrong variable
+- `@dataclass` on Config classes inheriting from ModuleConfig is now invalid (Pydantic conflict)
+
+**2. beartype 0.22.9 + `int | float` TypeAlias**
+- `Sequence[int | float]` in `TypeAlias` assignments evaluated at module level (bypasses `from __future__ import annotations`)
+- Creates `types.UnionType` that beartype's PEP 563 resolver chokes on
+- Error: `AssertionError: int | float not stringified type hint`
+- Affects plum `@dispatch` resolution in all geometry_msgs types
+
+### Fixes Applied (M20 Blueprint Only)
+
+| Issue | File | Fix |
+|-------|------|-----|
+| `@dataclass` on Pydantic Config | `costmapper.py` | Remove `@dataclass`, use `Field(default_factory=...)` |
+| `@dataclass` on Pydantic Config | `replanning_a_star/module.py` | Remove `@dataclass`, use `model_post_init` |
+| `dataclass_fields()` on Pydantic | `global_planner.py` | Use `model_fields` dict instead |
+| `__init__` signature (port) | `websocket_vis_module.py` | `global_config` as first positional param |
+| `__init__` signature (ip) | `m20/connection.py` | `global_config` as first positional param |
+| Lambda unpicklable in multiprocessing | `launch_nos.py` | Named functions instead of lambdas |
+| `int \| float` beartype crash | `Vector3.py`, `Quaternion.py`, `Pose.py` | `Union[int, float]` in TypeAlias, `float` in `@dispatch` sigs |
+
+### Upstream Modules Still Broken (Not in M20 Blueprint)
+
+These have the same `__init__` signature issue but aren't used by our blueprint:
+- `bbox_navigation.py` — `goal_distance` as pos-1
+- `gstreamer_camera.py` — `host: str` as pos-1
+- `drone/camera_module.py` — `camera_intrinsics` required pos-1
+- `drone/drone_tracking_module.py` — `outdoor: bool` as pos-1
+- `spatial_perception.py` — `collection_name: str` as pos-1
+- `person_tracker.py` — `cameraInfo` required pos-1
+- `object_tracker_3d.py` — `**kwargs` only, can't accept positional
+
+### Current State (Mar 4)
+
+| Component | Status | Notes |
+|---|---|---|
+| Upstream merge | **DONE** | 11 commits from origin/dev merged |
+| Module init fixes | **DEPLOYED** | All 7 M20 modules deploy cleanly |
+| beartype fix | **DEPLOYED** | Odometry parses without errors |
+| Web UI | **WORKING** | Port 7779 correctly configured |
+| /ODOM | **OK** | Data flowing on startup |
+| /IMU | **TIMEOUT** | Known issue, continuing anyway |
+| Next | Test navigation | Verify end-to-end with new upstream code |

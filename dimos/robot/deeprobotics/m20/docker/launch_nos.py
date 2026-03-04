@@ -54,6 +54,14 @@ AOS_ETH0 = "10.21.33.103"
 # - global_map visual_override: Render voxels as 3D boxes (not flat sprites).
 #   Lesh: 'has this "world/global_map": lambda grid: grid.to_rerun(voxel_size=0.1,
 #   mode="boxes") line in rerun bridge.'
+def _render_global_map(grid):
+    return grid.to_rerun(voxel_size=0.05, mode="boxes")
+
+
+def _render_costmap(grid):
+    return grid.to_rerun(colormap="Accent", z_offset=0.015, opacity=0.2, background="#484981")
+
+
 bp = autoconnect(
     m20_minimal,
     voxel_mapper(voxel_size=0.05, publish_interval=1.0, max_height=0.7),
@@ -75,15 +83,8 @@ bp = autoconnect(
         memory_limit="512MB",
         pubsubs=[LCM(autoconf=True)],
         visual_override={
-            "world/global_map": lambda grid: grid.to_rerun(
-                voxel_size=0.05, mode="boxes",
-            ),
-            "world/navigation_costmap": lambda grid: grid.to_rerun(
-                colormap="Accent",
-                z_offset=0.015,
-                opacity=0.2,
-                background="#484981",
-            ),
+            "world/global_map": _render_global_map,
+            "world/navigation_costmap": _render_costmap,
         },
     ),
 ).global_config(

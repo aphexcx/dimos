@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from io import BytesIO
 import struct
-from typing import TYPE_CHECKING, BinaryIO, TypeAlias
+from typing import TYPE_CHECKING, BinaryIO, TypeAlias, Union
 
 if TYPE_CHECKING:
     import rerun as rr
@@ -30,7 +30,7 @@ from scipy.spatial.transform import Rotation as R  # type: ignore[import-untyped
 from dimos.msgs.geometry_msgs.Vector3 import Vector3
 
 # Types that can be converted to/from Quaternion
-QuaternionConvertable: TypeAlias = Sequence[int | float] | LCMQuaternion | np.ndarray  # type: ignore[type-arg]
+QuaternionConvertable: TypeAlias = Sequence[Union[int, float]] | LCMQuaternion | np.ndarray  # type: ignore[type-arg]
 
 
 class Quaternion(LCMQuaternion):  # type: ignore[misc]
@@ -56,14 +56,14 @@ class Quaternion(LCMQuaternion):  # type: ignore[misc]
     def __init__(self) -> None: ...
 
     @dispatch  # type: ignore[no-redef]
-    def __init__(self, x: int | float, y: int | float, z: int | float, w: int | float) -> None:
+    def __init__(self, x: float, y: float, z: float, w: float) -> None:
         self.x = float(x)
         self.y = float(y)
         self.z = float(z)
         self.w = float(w)
 
     @dispatch  # type: ignore[no-redef]
-    def __init__(self, sequence: Sequence[int | float] | np.ndarray) -> None:  # type: ignore[type-arg]
+    def __init__(self, sequence: Sequence[Union[int, float]] | np.ndarray) -> None:  # type: ignore[type-arg]
         if isinstance(sequence, np.ndarray):
             if sequence.size != 4:
                 raise ValueError("Quaternion requires exactly 4 components [x, y, z, w]")

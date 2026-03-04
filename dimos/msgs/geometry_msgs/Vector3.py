@@ -15,13 +15,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, Union
 
 from dimos_lcm.geometry_msgs import Vector3 as LCMVector3
 import numpy as np
 
 # Types that can be converted to/from Vector
-VectorConvertable: TypeAlias = Sequence[int | float] | LCMVector3 | np.ndarray  # type: ignore[type-arg]
+VectorConvertable: TypeAlias = Sequence[Union[int, float]] | LCMVector3 | np.ndarray  # type: ignore[type-arg]
 
 
 def _ensure_3d(data: np.ndarray) -> np.ndarray:  # type: ignore[type-arg]
@@ -385,7 +385,7 @@ class Vector3(LCMVector3):  # type: ignore[misc]
         return not self.is_zero()
 
 
-def to_numpy(value: Vector3 | np.ndarray | Sequence[int | float]) -> np.ndarray:  # type: ignore[type-arg]
+def to_numpy(value: Vector3 | np.ndarray | Sequence[Union[int, float]]) -> np.ndarray:  # type: ignore[type-arg]
     """Convert a value to a numpy array."""
     if isinstance(value, Vector3):
         return value.to_numpy()
@@ -402,7 +402,7 @@ def to_vector(value: VectorConvertable | Vector3) -> Vector3:
     return Vector3(value)
 
 
-def to_tuple(value: Vector3 | np.ndarray | Sequence[int | float]) -> tuple[float, ...]:  # type: ignore[type-arg]
+def to_tuple(value: Vector3 | np.ndarray | Sequence[Union[int, float]]) -> tuple[float, ...]:  # type: ignore[type-arg]
     """Convert a value to a tuple."""
     if isinstance(value, Vector3):
         return value.to_tuple()
@@ -414,7 +414,7 @@ def to_tuple(value: Vector3 | np.ndarray | Sequence[int | float]) -> tuple[float
         return tuple(value)
 
 
-def to_list(value: Vector3 | np.ndarray | Sequence[int | float]) -> list[float]:  # type: ignore[type-arg]
+def to_list(value: Vector3 | np.ndarray | Sequence[Union[int, float]]) -> list[float]:  # type: ignore[type-arg]
     """Convert a value to a list."""
     if isinstance(value, Vector3):
         return value.to_list()

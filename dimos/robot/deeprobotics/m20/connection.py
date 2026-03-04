@@ -140,6 +140,7 @@ class M20Connection(Module, spec.Camera, spec.Pointcloud, LidarSpec, IMUSpec, Od
 
     def __init__(
         self,
+        global_config: GlobalConfig = global_config,
         ip: str | None = None,
         port: int = 30000,
         speed_limits: M20SpeedLimits | None = None,
@@ -149,11 +150,10 @@ class M20Connection(Module, spec.Camera, spec.Pointcloud, LidarSpec, IMUSpec, Od
         camera_stream: str = "video1",
         bridge_host: str | None = None,
         bridge_port: int = 9731,
-        cfg: GlobalConfig = global_config,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        self._global_config = cfg
+        self._global_config = global_config
 
         ip = ip if ip is not None else self._global_config.robot_ip
 

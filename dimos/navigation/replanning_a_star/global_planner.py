@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import math
-from dataclasses import fields as dataclass_fields
+
 from threading import Event, RLock, Thread, current_thread
 import time
 
@@ -82,14 +82,14 @@ class GlobalPlanner(Resource):
         self._navigation_map = NavigationMap(self._global_config)
 
         # Thread planner config fields to LocalPlanner → PController.
-        # Uses dataclass introspection so new Config fields are forwarded automatically.
+        # Uses Pydantic model introspection so new Config fields are forwarded automatically.
         lp_kwargs: dict[str, object] = {}
         if planner_config is not None:
             from dimos.core.module import ModuleConfig
-            parent_fields = {f.name for f in dataclass_fields(ModuleConfig)}
-            for f in dataclass_fields(planner_config):
-                if f.name not in parent_fields:
-                    lp_kwargs[f.name] = getattr(planner_config, f.name)
+            parent_fields = set(ModuleConfig.model_fields.keys())
+            for name in planner_config.model_fields:
+                if name not in parent_fields:
+                    lp_kwargs[name] = getattr(planner_config, name)
 
         self._local_planner = LocalPlanner(
             self._global_config, self._navigation_map, self._goal_tolerance, **lp_kwargs
