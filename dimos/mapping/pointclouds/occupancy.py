@@ -139,6 +139,7 @@ class HeightCostConfig(OccupancyConfig):
     ignore_noise: float = 0.05
     smoothing: float = 1.0
     max_height: float | None = None  # Filter points above this z-value (e.g. ceiling)
+    floor_z: float | None = None  # z-level of floor in ODOM frame (e.g., -0.5 for M20)
 
 
 def height_cost_occupancy(cloud: PointCloud2, **kwargs: Any) -> OccupancyGrid:
@@ -220,6 +221,13 @@ def height_cost_occupancy(cloud: PointCloud2, **kwargs: Any) -> OccupancyGrid:
     height_gap = max_height_map - min_height_map
     height_map = np.where(height_gap > cfg.can_pass_under, min_height_map, max_height_map)
 
+    # Clamp floor-level heights to a constant value.
+    # This eliminates gradient noise from floor measurements and ensures
+    # floor-only cells always get cost=0 (flat = no gradient).
+    if cfg.floor_z is not None:
+        floor_mask = ~np.isnan(height_map) & (height_map <= cfg.floor_z)
+        height_map = np.where(floor_mask, cfg.floor_z, height_map)
+
     # Track which cells have observations
     observed_mask = ~np.isnan(height_map)
     original_observed_mask = observed_mask.copy()  # Before smoothing extends it
@@ -249,8 +257,10 @@ def height_cost_occupancy(cloud: PointCloud2, **kwargs: Any) -> OccupancyGrid:
     # Step 4: Calculate rate of change (gradient magnitude)
     # Use Sobel filters for gradient calculation
     if np.any(observed_mask):
-        # Replace NaN with 0 for gradient calculation
-        height_for_grad = np.where(observed_mask, height_map, 0.0)
+        # Replace NaN with floor_z (or 0) for gradient calculation.
+        # Using floor_z prevents artificial gradients at floor/unknown boundaries.
+        fill_value = cfg.floor_z if cfg.floor_z is not None else 0.0
+        height_for_grad = np.where(observed_mask, height_map, fill_value)
 
         # Calculate gradients (Sobel gives gradient in pixels, scale by resolution)
         grad_x = ndimage.sobel(height_for_grad, axis=1) / (8.0 * cfg.resolution)
@@ -278,7 +288,7 @@ def height_cost_occupancy(cloud: PointCloud2, **kwargs: Any) -> OccupancyGrid:
         # by the BFS (threshold=99) and planner (threshold=100) while still
         # indicating moderate cost. Real obstacles in the interior keep full cost.
         smoothing_boundary = observed_mask & ~original_observed_mask
-        cost_float[smoothing_boundary] = np.minimum(cost_float[smoothing_boundary], 50.0)
+        cost_float[smoothing_boundary] = np.minimum(cost_float[smoothing_boundary], 49.0)
 
         # Erode the observed mask by 1 cell to avoid Sobel edge artifacts.
         structure = ndimage.generate_binary_structure(2, 1)  # 4-connectivity

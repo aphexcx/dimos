@@ -67,7 +67,7 @@ bp = autoconnect(
     voxel_mapper(voxel_size=0.05, publish_interval=1.0, max_height=0.7),
     cost_mapper(config=HeightCostConfig(
         max_height=0.7, resolution=0.05, ignore_noise=0.05, can_climb=0.25,
-        smoothing=5.0,
+        smoothing=5.0, floor_z=-0.5,
     )),
     replanning_a_star_planner(
         max_linear_speed=1.0,
