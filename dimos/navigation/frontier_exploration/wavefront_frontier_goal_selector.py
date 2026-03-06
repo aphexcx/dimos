@@ -214,7 +214,7 @@ class WavefrontFrontierExplorer(Module):
             Number of cells that are free space or obstacles (not unknown)
         """
         free_count = np.sum(costmap.grid == CostValues.FREE)
-        obstacle_count = np.sum(costmap.grid >= self.config.occupancy_threshold)
+        obstacle_count = np.sum(costmap.grid >= self.occupancy_threshold)
         return int(free_count + obstacle_count)
 
     def _get_neighbors(self, point: GridPoint, costmap: OccupancyGrid) -> list[GridPoint]:
@@ -251,11 +251,11 @@ class WavefrontFrontierExplorer(Module):
             neighbor_cost = costmap.grid[neighbor.y, neighbor.x]
 
             # If adjacent to occupied space, not a frontier
-            if neighbor_cost >= self.config.occupancy_threshold:
+            if neighbor_cost >= self.occupancy_threshold:
                 return False
 
             # Check if adjacent to known traversable space
-            if 0 <= neighbor_cost < self.config.occupancy_threshold:
+            if 0 <= neighbor_cost < self.occupancy_threshold:
                 has_free = True
                 break
 
@@ -279,7 +279,7 @@ class WavefrontFrontierExplorer(Module):
 
             # Check if this point is traversable (non-obstacle, non-unknown)
             cost = costmap.grid[point.y, point.x]
-            if 0 <= cost < self.config.occupancy_threshold:
+            if 0 <= cost < self.occupancy_threshold:
                 return (point.x, point.y)
 
             # Add neighbors to search
@@ -321,8 +321,8 @@ class WavefrontFrontierExplorer(Module):
         # Debug: costmap stats
         import numpy as _np
         _grid = costmap.grid
-        _n_free = int(_np.sum((_grid >= 0) & (_grid < self.config.occupancy_threshold)))
-        _n_occ = int(_np.sum(_grid >= self.config.occupancy_threshold))
+        _n_free = int(_np.sum((_grid >= 0) & (_grid < self.occupancy_threshold)))
+        _n_occ = int(_np.sum(_grid >= self.occupancy_threshold))
         _n_unk = int(_np.sum(_grid == CostValues.UNKNOWN))
         _robot_val = int(_grid[grid_y, grid_x]) if 0 <= grid_x < costmap.width and 0 <= grid_y < costmap.height else -999
         logger.info(
@@ -334,7 +334,7 @@ class WavefrontFrontierExplorer(Module):
             free_cells=_n_free,
             occupied_cells=_n_occ,
             unknown_cells=_n_unk,
-            occupancy_threshold=self.config.occupancy_threshold,
+            occupancy_threshold=self.occupancy_threshold,
         )
 
         # Find nearest free space to start exploration
@@ -427,7 +427,7 @@ class WavefrontFrontierExplorer(Module):
                     neighbor_cost = costmap.grid[neighbor.y, neighbor.x]
 
                     # Always traverse known non-obstacle cells (cost 0-98)
-                    if 0 <= neighbor_cost < self.config.occupancy_threshold:
+                    if 0 <= neighbor_cost < self.occupancy_threshold:
                         neighbor.classification |= PointClassification.MapOpen
                         map_queue.append(neighbor)
                     # Queue unknown cells only when adjacent to traversable
@@ -436,7 +436,7 @@ class WavefrontFrontierExplorer(Module):
                     # this branch requires current_cost to be traversable.
                     elif (
                         neighbor_cost == CostValues.UNKNOWN
-                        and 0 <= current_cost < self.config.occupancy_threshold
+                        and 0 <= current_cost < self.occupancy_threshold
                     ):
                         neighbor.classification |= PointClassification.MapOpen
                         map_queue.append(neighbor)
