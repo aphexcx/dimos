@@ -99,18 +99,18 @@ class WebsocketVisModule(Module):
 
     def __init__(
         self,
-        global_config: GlobalConfig = global_config,
         port: int = 7779,
+        cfg: GlobalConfig = global_config,
         **kwargs: Any,
     ) -> None:
         """Initialize the WebSocket visualization module.
 
         Args:
-            global_config: Global config for viewer backend settings
             port: Port to run the web server on
+            cfg: Optional global config for viewer backend settings
         """
-        super().__init__(global_config, **kwargs)
-        self._global_config = global_config
+        super().__init__(**kwargs)
+        self._global_config = cfg
 
         self.port = port
         self._uvicorn_server_thread: threading.Thread | None = None

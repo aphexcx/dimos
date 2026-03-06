@@ -31,8 +31,10 @@ from dimos.perception.detection.reid.type import IDSystem
 from dimos.perception.detection.type.detection2d.imageDetections2D import ImageDetections2D
 from dimos.types.timestamped import align_timestamped, to_ros_stamp
 from dimos.utils.reactive import backpressure
+from dataclasses import dataclass
 
 
+@dataclass
 class Config(ModuleConfig):
     idsystem: IDSystem
 

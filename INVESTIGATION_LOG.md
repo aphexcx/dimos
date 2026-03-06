@@ -2714,14 +2714,59 @@ These have the same `__init__` signature issue but aren't used by our blueprint:
 - `person_tracker.py` — `cameraInfo` required pos-1
 - `object_tracker_3d.py` — `**kwargs` only, can't accept positional
 
-### Current State (Mar 4)
+### Session: Mar 5 — Dockerfile Caching + Init Chain Fixes
+
+#### Dockerfile Improvements (Codex-recommended hybrid approach)
+Restructured Dockerfile into 4 cached layers for faster rebuilds:
+1. **Layer 1**: Copy `pyproject.toml` + `setup.py` only → install all deps (cached until deps change)
+2. **Layer 2**: drdds ROS2 bindings from .msg files (cached until .msg files change)
+3. **Layer 3**: `COPY .` source → `pip install --no-deps -e` (only rebuilds C++ pybind11 extension)
+4. **Layer 4**: Docker support files (entrypoint, fastdds.xml, launch script)
+
+Other Dockerfile changes:
+- Added `--mount=type=cache,target=/root/.cache/pip` on all pip layers (BuildKit)
+- Added `DOCKER_BUILDKIT=1` to deploy.sh build command
+- Added `sys_platform == 'darwin'` platform marker on `dimos-viewer` in pyproject.toml (replaces brittle `sed -i` hack)
+- Removed `--no-cache-dir` from pip install commands
+
+**Rebuild speed impact:**
+- Pure Python source changes: Layers 1-2 cached, only Layer 3 runs (~30s)
+- Dep changes (pyproject.toml): Layer 1 rebuilds with pip cache, Layer 2 cached
+- drdds .msg changes: Layer 1 cached, Layer 2 rebuilds
+
+#### Module Init Chain Fixes (upstream dev merge adaptation)
+After merging upstream dev, the Module init chain changed:
+`Module.__init__(**kwargs)` → `ModuleBase.__init__(**kwargs)` → `Configurable.__init__(**kwargs)` → `self.default_config(**kwargs)`
+
+All kwargs now flow unfiltered to the Config dataclass constructor. Two classes of issues found:
+
+**1. Missing `@dataclass` on Config subclasses (our feature branch code)**
+Config classes extending `ModuleConfig` (a `@dataclass`) need `@dataclass` decorator for their fields to be recognized:
+- `dimos/navigation/replanning_a_star/module.py` — added `@dataclass` to Config
+- `dimos/perception/detection/reid/module.py` — added `@dataclass` to Config
+- `dimos/mapping/costmapper.py` — upstream dev already had it; our branch was stale (merge didn't pick it up)
+
+**2. Pydantic vs dataclass API mismatch (our feature branch code)**
+- `global_planner.py` used `ModuleConfig.model_fields` (pydantic) → fixed to `dataclasses.fields()`
+- `costmapper.py` used pydantic `Field(default_factory=...)` → fixed to dataclass `field(default_factory=...)`
+- `websocket_vis_module.py` passed `global_config` positionally to `super().__init__()` → upstream uses `cfg` kwarg pattern
+
+**3. rclpy availability**
+rclpy is available in the container when the entrypoint properly sources `/opt/ros/humble/setup.bash` (adds ROS paths to PYTHONPATH). Key insight: `docker restart` preserves the original entrypoint, but starting with `--entrypoint sleep` then restarting loses it. Always use `deploy.sh start` for fresh containers, then `deploy.sh dev` for source sync.
+
+#### deploy.sh dev gotcha
+`deploy.sh dev` does `docker cp` + `docker restart`. The restart re-runs the SAME entrypoint the container was created with. If the container was created with `--entrypoint sleep` (for debugging), restart will run sleep again, not the real entrypoint. Always create containers via `deploy.sh start` first.
+
+### Current State (Mar 5)
 
 | Component | Status | Notes |
 |---|---|---|
-| Upstream merge | **DONE** | 11 commits from origin/dev merged |
+| Upstream merge | **DONE** | All upstream dev changes integrated |
 | Module init fixes | **DEPLOYED** | All 7 M20 modules deploy cleanly |
-| beartype fix | **DEPLOYED** | Odometry parses without errors |
-| Web UI | **WORKING** | Port 7779 correctly configured |
+| Dockerfile caching | **DONE** | 4-layer structure, BuildKit cache mounts |
+| dimos-viewer | **FIXED** | Platform marker in pyproject.toml, no more sed hack |
+| Web UI (7779) | **LISTENING** | http://10.21.41.1:7779/command-center |
+| Rerun (9876) | **LISTENING** | rerun+http://10.21.41.1:9876/proxy |
 | /ODOM | **OK** | Data flowing on startup |
 | /IMU | **TIMEOUT** | Known issue, continuing anyway |
-| Next | Test navigation | Verify end-to-end with new upstream code |
+| Next | Test navigation + rerun | Verify end-to-end exploration pipeline |

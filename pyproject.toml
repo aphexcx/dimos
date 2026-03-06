@@ -82,7 +82,7 @@ dependencies = [
     # TODO: rerun shouldn't be required but rn its in core (there is NO WAY to use dimos without rerun rn)
     # remove this once rerun is optional in core
     "rerun-sdk>=0.20.0",
-    "dimos-viewer>=0.30.0a2",
+    "dimos-viewer>=0.30.0a2; sys_platform == 'darwin'",
     "toolz>=1.1.0",
     "av>=16.1.0",
     "python-socketio>=5.16.1",
@@ -152,7 +152,7 @@ misc = [
 
 visualization = [
     "rerun-sdk>=0.20.0",
-    "dimos-viewer>=0.30.0a2",
+    "dimos-viewer>=0.30.0a2; sys_platform == 'darwin'",
 ]
 
 agents = [

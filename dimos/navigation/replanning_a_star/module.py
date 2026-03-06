@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 import math
 import os
 
@@ -28,6 +29,7 @@ from dimos.navigation.base import NavigationInterface, NavigationState
 from dimos.navigation.replanning_a_star.global_planner import GlobalPlanner
 
 
+@dataclass
 class Config(ModuleConfig):
     max_linear_speed: float = 0.55               # Max linear velocity (m/s)
     max_angular_speed: float = 0.55              # Max angular velocity (rad/s)
@@ -35,7 +37,7 @@ class Config(ModuleConfig):
     k_angular: float = 0.5                       # Proportional gain for yaw correction
     rotation_threshold: float = math.radians(90) # Above: rotate in place. Below: drive+rotate
 
-    def model_post_init(self, __context: object) -> None:
+    def __post_init__(self) -> None:
         if self.max_linear_speed <= 0:
             raise ValueError(f"max_linear_speed must be positive, got {self.max_linear_speed}")
         if self.max_angular_speed <= 0:

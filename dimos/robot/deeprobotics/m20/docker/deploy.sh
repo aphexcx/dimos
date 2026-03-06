@@ -233,8 +233,9 @@ case "${CMD}" in
         echo ""
 
         # Build on Mac (ARM64 native — same arch as NOS RK3588)
+        # BuildKit required for --mount=type=cache in Dockerfile
         echo "Building Docker image..."
-        docker build \
+        DOCKER_BUILDKIT=1 docker build \
             -t "${GHCR_IMAGE}" \
             -f "${DIMOS_ROOT}/dimos/robot/deeprobotics/m20/docker/Dockerfile" \
             "${DIMOS_ROOT}"
