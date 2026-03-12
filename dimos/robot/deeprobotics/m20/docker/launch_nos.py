@@ -85,6 +85,10 @@ bp = autoconnect(
         visual_override={
             "world/global_map": _render_global_map,
             "world/navigation_costmap": _render_costmap,
+            "world/camera_info": lambda camera_info: camera_info.to_rerun(
+                image_topic="/world/color_image",
+                optical_frame="camera_optical",
+            ),
         },
     ),
 ).global_config(
