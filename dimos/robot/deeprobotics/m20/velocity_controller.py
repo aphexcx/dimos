@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from dimos.msgs.geometry_msgs import Twist
 from dimos.utils.logging_config import setup_logger
