@@ -38,6 +38,8 @@ all_blueprints = {
     "unitree-g1-joystick": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:with_joystick",
     "unitree-g1-full": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:full_featured",
     "unitree-g1-detection": "dimos.robot.unitree_webrtc.unitree_g1_blueprints:detection",
+    # DeepRobotics M20 blueprints
+    "m20-rosnav": "dimos.robot.deeprobotics.m20.blueprints.rosnav.m20_rosnav:m20_rosnav",
     # Control orchestrator blueprints
     "orchestrator-mock": "dimos.control.blueprints:orchestrator_mock",
     "orchestrator-xarm7": "dimos.control.blueprints:orchestrator_xarm7",
