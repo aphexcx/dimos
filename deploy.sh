@@ -10,6 +10,7 @@
 #
 # Subcommands:
 #   setup   — One-time NOS host provisioning
+#   start   — Launch dimos on NOS host
 #   stop    — Stop host dimos process and nav container
 #   status  — Show health of host process, nav container, and ROS topics
 #   dev     — Sync source changes to NOS venv for rapid iteration
@@ -235,6 +236,71 @@ echo "DRDDS_READY"
     else
         warn "drdds import check failed — package may not be available yet"
     fi
+}
+
+# =====================================================================
+# start — launch dimos on NOS host
+# =====================================================================
+cmd_start() {
+    echo -e "${BOLD}Starting DimOS on NOS host...${NC}"
+
+    # Fail if already running
+    local pid
+    if pid=$(get_dimos_pid); then
+        error "DimOS is already running (PID $pid)."
+        error "Run './deploy.sh stop' first."
+        return 1
+    fi
+
+    # Verify venv exists
+    if [[ ! -x "$DIMOS_VENV/bin/python3" ]]; then
+        error "Python venv not found at $DIMOS_VENV"
+        error "Run './deploy.sh setup' first."
+        return 1
+    fi
+
+    # Verify drdds is importable
+    info "Checking drdds import..."
+    if ! "$DIMOS_VENV/bin/python3" -c "import drdds" 2>/dev/null; then
+        error "drdds is not importable."
+        error "Run './deploy.sh setup' to install drdds bindings."
+        return 1
+    fi
+    info "drdds OK"
+
+    # Disable lio_perception on AOS so FASTLIO2 owns the lidar
+    ensure_lio_disabled || {
+        error "Failed to disable lio_perception. Aborting start."
+        return 1
+    }
+
+    # Locate the launch script
+    local launch_script="$SCRIPT_DIR/dimos/robot/deeprobotics/m20/docker/launch_nos.py"
+    if [[ ! -f "$launch_script" ]]; then
+        error "Launch script not found: $launch_script"
+        return 1
+    fi
+
+    # Launch via nohup, record PID
+    info "Launching dimos (logging to $DIMOS_LOG)..."
+    nohup "$DIMOS_VENV/bin/python3" "$launch_script" \
+        >> "$DIMOS_LOG" 2>&1 &
+    local new_pid=$!
+
+    echo "$new_pid" > "$DIMOS_PID_FILE"
+    info "DimOS started (PID $new_pid)"
+
+    # Brief health check — verify process survived initial import
+    sleep 2
+    if ! kill -0 "$new_pid" 2>/dev/null; then
+        error "DimOS process exited immediately. Check logs:"
+        error "  tail -20 $DIMOS_LOG"
+        rm -f "$DIMOS_PID_FILE"
+        return 1
+    fi
+
+    info "DimOS is running. Nav container starts automatically via DockerModule."
+    info "Monitor with: ./deploy.sh status"
 }
 
 # =====================================================================
@@ -475,7 +541,7 @@ M20 ROSNav deployment manager for NOS host.
 
 Subcommands:
   setup    One-time NOS host provisioning (uv, Python 3.10, dimos, drdds)
-  start    Launch dimos on NOS host (not yet implemented)
+  start    Launch dimos on NOS host (venv, drdds check, nohup)
   stop     Stop host dimos process and nav container
   status   Show health of host, container, and ROS topics
   dev      Sync source changes to NOS venv
@@ -486,7 +552,7 @@ EOF
 
 case "${1:-}" in
     setup)       shift; cmd_setup "$@" ;;
-    start)       error "Not yet implemented"; exit 1 ;;
+    start)       shift; cmd_start "$@" ;;
     stop)        shift; cmd_stop "$@" ;;
     status)      shift; cmd_status "$@" ;;
     dev)         shift; cmd_dev "$@" ;;
