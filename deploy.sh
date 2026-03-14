@@ -34,10 +34,10 @@ DIMOS_VENV="/opt/dimos/venv"
 DIMOS_SRC="${SCRIPT_DIR}"
 NAV_IMAGE="dimos_autonomy_stack:humble"
 DRDDS_BUILDER_NAME="dimos-drdds-builder"
-DIMOS_PID_FILE="/var/run/dimos-nos.pid"
+DIMOS_PID_FILE="${HOME}/.dimos-nos.pid"
 NAV_CONTAINER="dimos-nav"
 LAUNCH_SCRIPT="launch_nos.py"
-DIMOS_LOG="/var/log/dimos-nos.log"
+DIMOS_LOG="${HOME}/dimos-nos.log"
 
 # --- AOS connection defaults (override via environment or .env) ---
 AOS_IP="${AOS_IP:-10.21.31.103}"
