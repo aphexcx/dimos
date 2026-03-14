@@ -76,11 +76,11 @@ if ! wait_for_topic "/IMU"; then
 fi
 
 if ! wait_for_topic "/LIDAR/POINTS"; then
-    err "Required topic /LIDAR/POINTS unavailable. Exiting."
-    exit 1
+    warn "/LIDAR/POINTS not visible via ros2 CLI (rsdriver is a bare DDS publisher)."
+    warn "FAST_LIO will discover it directly via FastDDS — proceeding with launch."
 fi
 
-log "All required topics available."
+log "Required topics checked. Launching navigation stack."
 
 # --- If explicit command provided, run it instead of auto-launch ---
 if [ $# -gt 0 ]; then
