@@ -24,7 +24,7 @@ when one output fans out to multiple consumers:
 from collections import defaultdict
 from enum import Enum, auto
 
-from dimos.core.blueprints import ModuleBlueprintSet
+from dimos.core.blueprints import Blueprint
 from dimos.core.introspection.utils import (
     GROUP_COLORS,
     TYPE_COLORS,
@@ -48,19 +48,18 @@ DEFAULT_IGNORED_CONNECTIONS = {("odom", "PoseStamped")}
 
 DEFAULT_IGNORED_MODULES = {
     "WebsocketVisModule",
-    "UtilizationModule",
     # "FoxgloveBridge",
 }
 
 
 def render(
-    blueprint_set: ModuleBlueprintSet,
+    blueprint_set: Blueprint,
     *,
     layout: set[LayoutAlgo] | None = None,
-    ignored_connections: set[tuple[str, str]] | None = None,
+    ignored_streams: set[tuple[str, str]] | None = None,
     ignored_modules: set[str] | None = None,
 ) -> str:
-    """Generate a hub-style DOT graph from a ModuleBlueprintSet.
+    """Generate a hub-style DOT graph from a Blueprint.
 
     This creates intermediate "type nodes" that represent data channels,
     connecting producers to consumers through a central hub node.
@@ -68,7 +67,7 @@ def render(
     Args:
         blueprint_set: The blueprint set to visualize.
         layout: Set of layout algorithms to apply. Default is none (let graphviz decide).
-        ignored_connections: Set of (name, type_name) tuples to ignore.
+        ignored_streams: Set of (name, type_name) tuples to ignore.
         ignored_modules: Set of module names to ignore.
 
     Returns:
@@ -77,8 +76,8 @@ def render(
     """
     if layout is None:
         layout = set()
-    if ignored_connections is None:
-        ignored_connections = DEFAULT_IGNORED_CONNECTIONS
+    if ignored_streams is None:
+        ignored_streams = DEFAULT_IGNORED_CONNECTIONS
     if ignored_modules is None:
         ignored_modules = DEFAULT_IGNORED_MODULES
 
@@ -91,14 +90,14 @@ def render(
 
     for bp in blueprint_set.blueprints:
         module_classes[bp.module.__name__] = bp.module
-        for conn in bp.connections:
+        for conn in bp.streams:
             # Apply remapping
             remapped_name = blueprint_set.remapping_map.get((bp.module, conn.name), conn.name)
             key = (remapped_name, conn.type)
             if conn.direction == "out":
-                producers[key].append(bp.module)
+                producers[key].append(bp.module)  # type: ignore[index]
             else:
-                consumers[key].append(bp.module)
+                consumers[key].append(bp.module)  # type: ignore[index]
 
     # Find all active channels (have both producers AND consumers)
     active_channels: dict[tuple[str, type], str] = {}  # key -> color
@@ -107,7 +106,7 @@ def render(
         type_name = type_.__name__
         if key not in consumers:
             continue
-        if (name, type_name) in ignored_connections:
+        if (name, type_name) in ignored_streams:
             continue
         # Check if all modules are ignored
         valid_producers = [m for m in producers[key] if m.__name__ not in ignored_modules]
@@ -224,12 +223,12 @@ def render(
 
 
 def render_svg(
-    blueprint_set: ModuleBlueprintSet,
+    blueprint_set: Blueprint,
     output_path: str,
     *,
     layout: set[LayoutAlgo] | None = None,
 ) -> None:
-    """Generate an SVG file from a ModuleBlueprintSet using graphviz.
+    """Generate an SVG file from a Blueprint using graphviz.
 
     Args:
         blueprint_set: The blueprint set to visualize.

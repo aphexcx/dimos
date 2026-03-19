@@ -2,8 +2,7 @@ ARG FROM_IMAGE=ghcr.io/dimensionalos/ros:dev
 FROM ${FROM_IMAGE}
 
 # Install basic requirements
-RUN apt-get update
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     python-is-python3 \
     curl \
     gnupg2 \
@@ -13,7 +12,7 @@ RUN apt-get install -y \
     portaudio19-dev \
     git \
     mesa-utils \
-    libgl1-mesa-glx \
+    libgl1 \
     libgl1-mesa-dri \
     software-properties-common \
     libxcb1-dev \
@@ -43,10 +42,3 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
-
-# Copy entire project first to ensure proper package installation
-COPY . /app/
-
-# Install dependencies with UV (10-100x faster than pip)
-RUN uv pip install --upgrade 'pip>=24' 'setuptools>=70' 'wheel' 'packaging>=24' && \
-    uv pip install '.[misc,cpu,sim,drone,unitree,web,perception,visualization]'

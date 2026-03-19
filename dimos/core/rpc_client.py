@@ -13,17 +13,18 @@
 # limitations under the License.
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dimos.protocol.rpc import LCMRPC
+from dimos.core.stream import RemoteStream
+from dimos.core.worker import MethodCallProxy
+from dimos.protocol.rpc import LCMRPC, RPCSpec
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
 
 
 class RpcCall:
-    _original_method: Callable[..., Any] | None
-    _rpc: LCMRPC | None
+    _rpc: RPCSpec | None
     _name: str
     _remote_name: str
     _unsub_fns: list  # type: ignore[type-arg]
@@ -32,13 +33,12 @@ class RpcCall:
     def __init__(
         self,
         original_method: Callable[..., Any] | None,
-        rpc: LCMRPC,
+        rpc: RPCSpec,
         name: str,
         remote_name: str,
         unsub_fns: list,  # type: ignore[type-arg]
         stop_client: Callable[[], None] | None = None,
     ) -> None:
-        self._original_method = original_method
         self._rpc = rpc
         self._name = name
         self._remote_name = remote_name
@@ -50,7 +50,7 @@ class RpcCall:
             self.__name__ = original_method.__name__
             self.__qualname__ = f"{self.__class__.__name__}.{original_method.__name__}"
 
-    def set_rpc(self, rpc: LCMRPC) -> None:
+    def set_rpc(self, rpc: RPCSpec) -> None:
         self._rpc = rpc
 
     def __call__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -71,10 +71,10 @@ class RpcCall:
         return result
 
     def __getstate__(self):  # type: ignore[no-untyped-def]
-        return (self._original_method, self._name, self._remote_name)
+        return (self._name, self._remote_name)
 
     def __setstate__(self, state) -> None:  # type: ignore[no-untyped-def]
-        self._original_method, self._name, self._remote_name = state
+        self._name, self._remote_name = state
         self._unsub_fns = []
         self._rpc = None
         self._stop_rpc_client = None
@@ -138,4 +138,23 @@ class RPCClient:
 
         # return super().__getattr__(name)
         # Try to avoid recursion by directly accessing attributes that are known
-        return self.actor_instance.__getattr__(name)
+        result = self.actor_instance.__getattr__(name)
+
+        # When streams are returned from the worker, their owner is a pickled
+        # Actor with no connection. Replace it with a MethodCallProxy that can
+        # talk to the worker through the parent-side Actor's pipe.
+        if isinstance(result, RemoteStream):
+            result.owner = MethodCallProxy(self.actor_instance)
+
+        return result
+
+
+if TYPE_CHECKING:
+    from dimos.core.module import Module
+
+    # the class below is only ever used for type hinting
+    # why? because the RPCClient instance is going to have all the methods of a Module
+    # but those methods/attributes are super dynamic, so the type hints can't figure that out
+    class ModuleProxy(RPCClient, Module):  # type: ignore[misc]
+        def start(self) -> None: ...
+        def stop(self) -> None: ...

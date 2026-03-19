@@ -22,7 +22,8 @@ from dimos_lcm.vision_msgs import (
 )
 import numpy as np
 
-from dimos.core import In, Out, rpc
+from dimos.core.core import rpc
+from dimos.core.stream import In, Out
 from dimos.msgs.geometry_msgs import Pose, Quaternion, Transform, Vector3
 from dimos.msgs.sensor_msgs import Image, ImageFormat
 from dimos.msgs.std_msgs import Header
@@ -283,7 +284,7 @@ class ObjectTracker3D(ObjectTracker2D):
         """Draw Re-ID feature matches on visualization."""
         import cv2
 
-        viz_image = image.copy()
+        viz_image: np.ndarray = image.copy()  # type: ignore[type-arg]
         x1, y1, _x2, _y2 = self.last_roi_bbox  # type: ignore[attr-defined]
 
         # Draw keypoints

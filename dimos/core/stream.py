@@ -22,13 +22,12 @@ from typing import (
     TypeVar,
 )
 
-from dask.distributed import Actor
 import reactivex as rx
 from reactivex import operators as ops
 from reactivex.disposable import Disposable
 
-import dimos.core.colors as colors
 from dimos.core.resource import Resource
+from dimos.utils import colors
 from dimos.utils.logging_config import setup_logger
 import dimos.utils.reactive as reactive
 from dimos.utils.reactive import backpressure
@@ -69,7 +68,7 @@ class ObservableMixin(Generic[T]):
 
     # default return is backpressured because most
     # use cases will want this by default
-    def observable(self):  # type: ignore[no-untyped-def]
+    def observable(self) -> Observable[T]:
         return backpressure(self.pure_observable())
 
 
@@ -132,11 +131,7 @@ class Stream(Generic[T]):
             + " "
             + self._color_fn()(f"{self.name}[{self.type_name}]")
             + " @ "
-            + (
-                colors.orange(self.owner)  # type: ignore[arg-type]
-                if isinstance(self.owner, Actor)
-                else colors.green(self.owner)  # type: ignore[arg-type]
-            )
+            + colors.green(self.owner)  # type: ignore[arg-type]
             + ("" if not self._transport else " via " + str(self._transport))
         )
 
@@ -255,7 +250,7 @@ class In(Stream[T], ObservableMixin[T]):
 
 
 # representation of input outside of module
-# used for configuring connections, setting a transport
+# used for configuring streams, setting a transport
 class RemoteIn(RemoteStream[T]):
     def connect(self, other: RemoteOut[T]) -> None:
         return self.owner.connect_stream(self.name, other).result()  # type: ignore[no-any-return, union-attr]

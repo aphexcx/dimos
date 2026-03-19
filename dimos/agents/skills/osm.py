@@ -13,19 +13,19 @@
 # limitations under the License.
 
 
-from dimos.core.skill_module import SkillModule
+from dimos.agents.annotation import skill
+from dimos.core.module import Module
 from dimos.core.stream import In
 from dimos.mapping.osm.current_location_map import CurrentLocationMap
 from dimos.mapping.types import LatLon
 from dimos.mapping.utils.distance import distance_in_meters
 from dimos.models.vl.qwen import QwenVlModel
-from dimos.protocol.skill.skill import skill
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
 
 
-class OsmSkill(SkillModule):
+class OsmSkill(Module):
     _latest_location: LatLon | None
     _current_location_map: CurrentLocationMap
 
@@ -38,7 +38,12 @@ class OsmSkill(SkillModule):
 
     def start(self) -> None:
         super().start()
-        self._disposables.add(self.gps_location.subscribe(self._on_gps_location))  # type: ignore[arg-type]
+        if hasattr(self.gps_location, "subscribe"):
+            self._disposables.add(self.gps_location.subscribe(self._on_gps_location))  # type: ignore[arg-type]
+        else:
+            logger.warning(
+                "OsmSkill: gps_location stream does not support direct subscribe (RemoteIn)"
+            )
 
     def stop(self) -> None:
         super().stop()
@@ -46,7 +51,7 @@ class OsmSkill(SkillModule):
     def _on_gps_location(self, location: LatLon) -> None:
         self._latest_location = location
 
-    @skill()
+    @skill
     def map_query(self, query_sentence: str) -> str:
         """This skill uses a vision language model to find something on the map
         based on the query sentence. You can query it with something like "Where

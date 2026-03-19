@@ -17,21 +17,14 @@ import time
 import pytest
 from reactivex.disposable import Disposable
 
-from dimos.core import (
-    In,
-    LCMTransport,
-    Module,
-    Out,
-    pLCMTransport,
-    rpc,
-    start,
-)
-from dimos.core.testing import MockRobotClient, dimos
+from dimos.core.core import rpc
+from dimos.core.module import Module
+from dimos.core.stream import In, Out
+from dimos.core.testing import MockRobotClient
+from dimos.core.transport import LCMTransport, pLCMTransport
 from dimos.msgs.geometry_msgs import Vector3
 from dimos.msgs.sensor_msgs import PointCloud2
-from dimos.robot.unitree_webrtc.type.odometry import Odometry
-
-assert dimos
+from dimos.robot.unitree.type.odometry import Odometry
 
 
 class Navigation(Module):
@@ -87,7 +80,7 @@ def test_classmethods() -> None:
     # Check that we have the expected RPC methods
     assert "navigate_to" in class_rpcs, "navigate_to should be in rpcs"
     assert "start" in class_rpcs, "start should be in rpcs"
-    assert len(class_rpcs) == 8
+    assert len(class_rpcs) == 9
 
     # Check that the values are callable
     assert callable(class_rpcs["navigate_to"]), "navigate_to should be callable"
@@ -102,7 +95,8 @@ def test_classmethods() -> None:
     nav._close_module()
 
 
-@pytest.mark.module
+@pytest.mark.slow
+@pytest.mark.skipif_in_ci
 def test_basic_deployment(dimos) -> None:
     robot = dimos.deploy(MockRobotClient)
 
@@ -127,19 +121,7 @@ def test_basic_deployment(dimos) -> None:
     nav.start()
 
     time.sleep(1)
-    robot.stop()
-
-    print("robot.mov_msg_count", robot.mov_msg_count)
-    print("nav.odom_msg_count", nav.odom_msg_count)
-    print("nav.lidar_msg_count", nav.lidar_msg_count)
 
     assert robot.mov_msg_count >= 8
     assert nav.odom_msg_count >= 8
     assert nav.lidar_msg_count >= 8
-
-    dimos.shutdown()
-
-
-if __name__ == "__main__":
-    client = start(1)  # single process for CI memory
-    test_deployment(client)

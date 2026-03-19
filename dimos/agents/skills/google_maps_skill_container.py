@@ -15,18 +15,18 @@
 import json
 from typing import Any
 
+from dimos.agents.annotation import skill
 from dimos.core.core import rpc
-from dimos.core.skill_module import SkillModule
+from dimos.core.module import Module
 from dimos.core.stream import In
 from dimos.mapping.google_maps.google_maps import GoogleMaps
 from dimos.mapping.types import LatLon
-from dimos.protocol.skill.skill import skill
 from dimos.utils.logging_config import setup_logger
 
 logger = setup_logger()
 
 
-class GoogleMapsSkillContainer(SkillModule):
+class GoogleMapsSkillContainer(Module):
     _latest_location: LatLon | None = None
     _client: GoogleMaps
 
@@ -34,7 +34,15 @@ class GoogleMapsSkillContainer(SkillModule):
 
     def __init__(self) -> None:
         super().__init__()
-        self._client = GoogleMaps()
+        try:
+            self._client = GoogleMaps()
+        except ValueError:
+            from dimos.utils.logging_config import setup_logger
+
+            setup_logger().warning(
+                "GOOGLE_MAPS_API_KEY not set — GoogleMapsSkillContainer disabled"
+            )
+            self._client = None  # type: ignore[assignment]
         self._started = True
         self._max_valid_distance = 20000  # meters
 
@@ -55,7 +63,7 @@ class GoogleMapsSkillContainer(SkillModule):
             raise ValueError("The position has not been set yet.")
         return self._latest_location
 
-    @skill()
+    @skill
     def where_am_i(self, context_radius: int = 200) -> str:
         """This skill returns information about what street/locality/city/etc
         you are in. It also gives you nearby landmarks.
@@ -72,6 +80,8 @@ class GoogleMapsSkillContainer(SkillModule):
 
         result = None
         try:
+            if self._client is None:
+                return "Google Maps is not configured (missing API key)."
             result = self._client.get_location_context(location, radius=context_radius)
         except Exception:
             return "There is an issue with the Google Maps API."
@@ -81,7 +91,7 @@ class GoogleMapsSkillContainer(SkillModule):
 
         return result.model_dump_json()
 
-    @skill()
+    @skill
     def get_gps_position_for_queries(self, queries: list[str]) -> str:
         """Get the GPS position (latitude/longitude) from Google Maps for know landmarks or searchable locations.
            This includes anything that wouldn't be viewable on a physical OSM map including intersections (5th and Natoma)
@@ -102,6 +112,9 @@ class GoogleMapsSkillContainer(SkillModule):
 
         for query in queries:
             try:
+                if self._client is None:
+                    latlon = None
+                    continue
                 latlon = self._client.get_position(query, location)
             except Exception:
                 latlon = None

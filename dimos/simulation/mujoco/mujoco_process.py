@@ -63,7 +63,8 @@ class MockController:
             self._command[0] = linear[0]  # forward/backward
             self._command[1] = linear[1]  # left/right
             self._command[2] = angular[2]  # rotation
-        return self._command.copy()
+        result: NDArray[Any] = self._command.copy()
+        return result
 
     def stop(self) -> None:
         """Stop method to satisfy InputController protocol."""
@@ -228,17 +229,19 @@ def _run_simulation(config: GlobalConfig, shm: ShmReader) -> None:
 
 
 if __name__ == "__main__":
-
-    def signal_handler(_signum: int, _frame: Any) -> None:
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
     global_config = pickle.loads(base64.b64decode(sys.argv[1]))
     shm_names = json.loads(sys.argv[2])
 
     shm = ShmReader(shm_names)
+
+    def signal_handler(_signum: int, _frame: Any) -> None:
+        # Signal the main loop to exit gracefully so the viewer context
+        # manager can close the window and clean up resources.
+        shm.signal_stop()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     try:
         _run_simulation(global_config, shm)
     finally:

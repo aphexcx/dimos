@@ -13,6 +13,8 @@
 # limitations under the License.
 
 
+from typing import TYPE_CHECKING
+
 from dimos_lcm.foxglove_msgs.ImageAnnotations import (
     ImageAnnotations,
 )
@@ -21,19 +23,23 @@ from reactivex import operators as ops
 from reactivex.observable import Observable
 
 from dimos import spec
-from dimos.agents import skill  # type: ignore[attr-defined]
-from dimos.core import DimosCluster, In, Out, rpc
+from dimos.agents.annotation import skill
+from dimos.core.core import rpc
+from dimos.core.module_coordinator import ModuleCoordinator
+from dimos.core.stream import In, Out
+from dimos.core.transport import LCMTransport
 from dimos.msgs.geometry_msgs import PoseStamped, Quaternion, Transform, Vector3
 from dimos.msgs.sensor_msgs import Image, PointCloud2
 from dimos.msgs.vision_msgs import Detection2DArray
 from dimos.perception.detection.module2D import Detection2DModule
-from dimos.perception.detection.type import (
-    ImageDetections2D,
-    ImageDetections3DPC,
-)
+from dimos.perception.detection.type.detection2d.imageDetections2D import ImageDetections2D
 from dimos.perception.detection.type.detection3d import Detection3DPC
+from dimos.perception.detection.type.detection3d.imageDetections3DPC import ImageDetections3DPC
 from dimos.types.timestamped import align_timestamped
 from dimos.utils.reactive import backpressure
+
+if TYPE_CHECKING:
+    from dimos.core.rpc_client import ModuleProxy
 
 
 class Detection3DModule(Detection2DModule):
@@ -105,7 +111,7 @@ class Detection3DModule(Detection2DModule):
         # Camera optical frame: X right, Y down, Z forward
         return Vector3(x_norm * assumed_depth, y_norm * assumed_depth, assumed_depth)
 
-    @skill()
+    @skill
     def ask_vlm(self, question: str) -> str:
         """asks a visual model about the view of the robot, for example
         is the bannana in the trunk?
@@ -196,14 +202,12 @@ class Detection3DModule(Detection2DModule):
 
 
 def deploy(  # type: ignore[no-untyped-def]
-    dimos: DimosCluster,
+    dimos: ModuleCoordinator,
     lidar: spec.Pointcloud,
     camera: spec.Camera,
     prefix: str = "/detector3d",
     **kwargs,
-) -> Detection3DModule:
-    from dimos.core import LCMTransport
-
+) -> "ModuleProxy":
     detector = dimos.deploy(Detection3DModule, camera_info=camera.hardware_camera_info, **kwargs)  # type: ignore[attr-defined]
 
     detector.image.connect(camera.color_image)
@@ -223,7 +227,7 @@ def deploy(  # type: ignore[no-untyped-def]
 
     detector.start()
 
-    return detector  # type: ignore[no-any-return]
+    return detector
 
 
 detection3d_module = Detection3DModule.blueprint

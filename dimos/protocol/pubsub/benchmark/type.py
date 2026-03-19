@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any, Generic
 
 from dimos.protocol.pubsub.spec import MsgT, PubSub, TopicT
+from dimos.utils.human import human_bytes, human_duration, human_number
 
 MsgGen = Callable[[int], tuple[TopicT, MsgT]]
 
@@ -39,26 +40,6 @@ class Case(Generic[TopicT, MsgT]):
 
 
 TestData = Sequence[Case[Any, Any]]
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format byte size to human-readable string."""
-    if size_bytes >= 1048576:
-        return f"{size_bytes / 1048576:.1f} MB"
-    if size_bytes >= 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    return f"{size_bytes} B"
-
-
-def _format_throughput(bytes_per_sec: float) -> str:
-    """Format throughput to human-readable string."""
-    if bytes_per_sec >= 1e9:
-        return f"{bytes_per_sec / 1e9:.2f} GB/s"
-    if bytes_per_sec >= 1e6:
-        return f"{bytes_per_sec / 1e6:.2f} MB/s"
-    if bytes_per_sec >= 1e3:
-        return f"{bytes_per_sec / 1e3:.2f} KB/s"
-    return f"{bytes_per_sec:.2f} B/s"
 
 
 @dataclass
@@ -117,7 +98,7 @@ class BenchmarkResults:
         table.add_column("Sent", justify="right")
         table.add_column("Recv", justify="right")
         table.add_column("Msgs/s", justify="right", style="green")
-        table.add_column("Throughput", justify="right", style="green")
+        table.add_column("MiB/s", justify="right", style="green")
         table.add_column("Latency", justify="right")
         table.add_column("Loss", justify="right")
 
@@ -126,11 +107,13 @@ class BenchmarkResults:
             recv_style = "yellow" if r.receive_time > 0.1 else "dim"
             table.add_row(
                 r.transport,
-                _format_size(r.msg_size_bytes),
+                human_bytes(r.msg_size_bytes, decimals=0),
                 f"{r.msgs_sent:,}",
                 f"{r.msgs_received:,}",
                 f"{r.throughput_msgs:,.0f}",
-                _format_throughput(r.throughput_bytes),
+                (lambda m: f"{m:.2f}" if m < 1 else f"{m:.1f}" if m < 10 else f"{m:.0f}")(
+                    r.throughput_bytes / 1024**2
+                ),
                 f"[{recv_style}]{r.receive_time * 1000:.0f}ms[/{recv_style}]",
                 f"[{loss_style}]{r.loss_pct:.1f}%[/{loss_style}]",
             )
@@ -148,13 +131,6 @@ class BenchmarkResults:
         """Generic heatmap printer."""
         if not self.results:
             return
-
-        def size_id(size: int) -> str:
-            if size >= 1048576:
-                return f"{size // 1048576}MB"
-            if size >= 1024:
-                return f"{size // 1024}KB"
-            return f"{size}B"
 
         transports = sorted(set(r.transport for r in self.results))
         sizes = sorted(set(r.msg_size_bytes for r in self.results))
@@ -211,7 +187,7 @@ class BenchmarkResults:
             return gradient[int(t * (len(gradient) - 1))]
 
         reset = "\033[0m"
-        size_labels = [size_id(s) for s in sizes]
+        size_labels = [human_bytes(s, concise=True, decimals=0) for s in sizes]
         col_w = max(8, max(len(s) for s in size_labels) + 1)
         transport_w = max(len(t) for t in transports) + 1
 
@@ -236,31 +212,30 @@ class BenchmarkResults:
     def print_heatmap(self) -> None:
         """Print msgs/sec heatmap."""
 
-        def fmt(v: float) -> str:
-            return f"{v / 1000:.1f}k" if v >= 1000 else f"{v:.0f}"
-
-        self._print_heatmap("Msgs/sec", lambda r: r.throughput_msgs, fmt)
+        self._print_heatmap("Msgs/sec", lambda r: r.throughput_msgs, human_number)
 
     def print_bandwidth_heatmap(self) -> None:
         """Print bandwidth heatmap."""
 
         def fmt(v: float) -> str:
-            if v >= 1e9:
-                return f"{v / 1e9:.1f}G"
-            if v >= 1e6:
-                return f"{v / 1e6:.0f}M"
-            if v >= 1e3:
-                return f"{v / 1e3:.0f}K"
-            return f"{v:.0f}"
+            return human_bytes(v, concise=True, decimals=1)
 
-        self._print_heatmap("Bandwidth", lambda r: r.throughput_bytes, fmt)
+        self._print_heatmap("Bandwidth (IEC)", lambda r: r.throughput_bytes, fmt)
 
     def print_latency_heatmap(self) -> None:
         """Print latency heatmap (time waiting for messages after publishing)."""
 
-        def fmt(v: float) -> str:
-            if v >= 1:
-                return f"{v:.1f}s"
-            return f"{v * 1000:.0f}ms"
+        self._print_heatmap(
+            "Latency",
+            lambda r: r.receive_time,
+            lambda v: human_duration(v, signed=False),
+            high_is_good=False,
+        )
 
-        self._print_heatmap("Latency", lambda r: r.receive_time, fmt, high_is_good=False)
+    def print_loss_heatmap(self) -> None:
+        """Print message loss percentage heatmap."""
+
+        def fmt(v: float) -> str:
+            return f"{v:.1f}%"
+
+        self._print_heatmap("Loss %", lambda r: r.loss_pct, fmt, high_is_good=False)

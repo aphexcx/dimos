@@ -12,19 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import atexit
 from dataclasses import dataclass, field
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
-import pyrealsense2 as rs  # type: ignore[import-not-found]
 import reactivex as rx
 from scipy.spatial.transform import Rotation  # type: ignore[import-untyped]
 
-from dimos.core import Module, ModuleConfig, Out, rpc
+from dimos.core.core import rpc
+from dimos.core.module import Module, ModuleConfig
 from dimos.core.module_coordinator import ModuleCoordinator
+from dimos.core.stream import Out
 from dimos.core.transport import LCMTransport
 from dimos.hardware.sensors.camera.spec import (
     OPTICAL_ROTATION,
@@ -38,6 +42,9 @@ from dimos.msgs.sensor_msgs.PointCloud2 import PointCloud2
 from dimos.robot.foxglove_bridge import FoxgloveBridge
 from dimos.spec import perception
 from dimos.utils.reactive import backpressure
+
+if TYPE_CHECKING:
+    import pyrealsense2 as rs  # type: ignore[import-untyped,import-not-found]
 
 
 def default_base_transform() -> Transform:
@@ -112,6 +119,8 @@ class RealSenseCamera(DepthCameraHardware, Module, perception.DepthCamera):
 
     @rpc
     def start(self) -> None:
+        import pyrealsense2 as rs  # type: ignore[import-untyped,import-not-found]
+
         self._pipeline = rs.pipeline()
         config = rs.config()
 
@@ -178,6 +187,8 @@ class RealSenseCamera(DepthCameraHardware, Module, perception.DepthCamera):
             self.depth_camera_info.publish(self._depth_camera_info)
 
     def _build_camera_info(self) -> None:
+        import pyrealsense2 as rs  # type: ignore[import-untyped,import-not-found]
+
         if self._profile is None:
             return
 
@@ -203,6 +214,8 @@ class RealSenseCamera(DepthCameraHardware, Module, perception.DepthCamera):
                 )
 
     def _intrinsics_to_camera_info(self, intrinsics: rs.intrinsics, frame_id: str) -> CameraInfo:
+        import pyrealsense2 as rs  # type: ignore[import-untyped,import-not-found]
+
         fx, fy = intrinsics.fx, intrinsics.fy
         cx, cy = intrinsics.ppx, intrinsics.ppy
 
@@ -230,6 +243,8 @@ class RealSenseCamera(DepthCameraHardware, Module, perception.DepthCamera):
         )
 
     def _get_extrinsics(self) -> None:
+        import pyrealsense2 as rs  # type: ignore[import-untyped,import-not-found]
+
         if self._profile is None or not self.config.enable_depth:
             return
 

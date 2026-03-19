@@ -11,7 +11,7 @@ A minimal virtual robot for testing and development. It implements some of the s
 
 Physical robots typically publish multiple poses in a relationship as `TransformStamped` in a TF tree, while SimpleRobot publishes `PoseStamped` directly for simplicity.
 
-For details on this check [Transforms](/docs/api/transforms.md)
+For details on this check [Transforms](/docs/usage/transforms.md)
 
 ## Usage
 
@@ -33,7 +33,7 @@ Use `lcmspy` in another terminal to inspect messages. Press `q` or `Esc` to quit
 From any language with LCM bindings, publish `Twist` messages to `/cmd_vel`:
 
 ```python
-from dimos.core import LCMTransport
+from dimos.core.transport import LCMTransport
 from dimos.msgs.geometry_msgs import Twist
 
 transport = LCMTransport("/cmd_vel", Twist)

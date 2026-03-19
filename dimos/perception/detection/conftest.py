@@ -21,7 +21,7 @@ from dimos_lcm.foxglove_msgs.SceneUpdate import SceneUpdate
 from dimos_lcm.visualization_msgs.MarkerArray import MarkerArray
 import pytest
 
-from dimos.core import LCMTransport
+from dimos.core.transport import LCMTransport
 from dimos.msgs.geometry_msgs import Transform
 from dimos.msgs.sensor_msgs import CameraInfo, Image, PointCloud2
 from dimos.msgs.vision_msgs import Detection2DArray
@@ -35,8 +35,8 @@ from dimos.perception.detection.type import (
     ImageDetections3DPC,
 )
 from dimos.protocol.tf import TF
-from dimos.robot.unitree.connection import go2
-from dimos.robot.unitree_webrtc.type.odometry import Odometry
+from dimos.robot.unitree.go2 import connection
+from dimos.robot.unitree.type.odometry import Odometry
 from dimos.utils.data import get_data
 from dimos.utils.testing import TimedSensorReplay
 
@@ -100,7 +100,7 @@ def get_moment(tf):
         if odom_frame is None:
             raise ValueError("No odom frame found")
 
-        transforms = go2.GO2Connection._odom_to_tf(odom_frame)
+        transforms = connection.GO2Connection._odom_to_tf(odom_frame)
 
         tf.receive_transform(*transforms)
 
@@ -108,12 +108,13 @@ def get_moment(tf):
             "odom_frame": odom_frame,
             "lidar_frame": lidar_frame,
             "image_frame": image_frame,
-            "camera_info": go2._camera_info_static(),
+            "camera_info": connection._camera_info_static(),
             "transforms": transforms,
             "tf": tf,
         }
 
-    return moment_provider
+    yield moment_provider
+    moment_provider.cache_clear()
 
 
 @pytest.fixture(scope="session")
@@ -217,6 +218,7 @@ def get_moment_2d(get_moment) -> Generator[Callable[[], Moment2D], None, None]:
 
     yield moment_provider
 
+    moment_provider.cache_clear()
     module._close_module()
 
 
@@ -250,6 +252,7 @@ def get_moment_3dpc(get_moment_2d) -> Generator[Callable[[], Moment3D], None, No
         }
 
     yield moment_provider
+    moment_provider.cache_clear()
     if module is not None:
         module._close_module()
 
@@ -260,8 +263,8 @@ def object_db_module(get_moment):
     from dimos.perception.detection.detectors import Yolo2DDetector
 
     module2d = Detection2DModule(detector=lambda: Yolo2DDetector(device="cpu"))
-    module3d = Detection3DModule(camera_info=go2._camera_info_static())
-    moduleDB = ObjectDBModule(camera_info=go2._camera_info_static())
+    module3d = Detection3DModule(camera_info=connection._camera_info_static())
+    moduleDB = ObjectDBModule(camera_info=connection._camera_info_static())
 
     # Process 5 frames to build up object history
     for i in range(5):

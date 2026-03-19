@@ -21,7 +21,7 @@ import time
 import typer
 
 from dimos.core.transport import LCMTransport, pLCMTransport
-from dimos.protocol.pubsub.lcmpubsub import LCMPubSubBase
+from dimos.protocol.pubsub.impl.lcmpubsub import LCMPubSubBase
 
 _modules_to_try = [
     "dimos.msgs.geometry_msgs",
@@ -67,8 +67,13 @@ def topic_echo(topic: str, type_name: str | None) -> None:
             typer.echo("\nStopped.")
         return
 
+    # Warn about missing system config for standalone CLI usage.
+    from dimos.protocol.service.lcmservice import autoconf
+
+    autoconf(check_only=True)
+
     # Inferred typed mode: listen on /topic#pkg.Msg and decode from the msg_name suffix.
-    bus = LCMPubSubBase(autoconf=True)
+    bus = LCMPubSubBase()
     bus.start()  # starts threaded handle loop
 
     typed_pattern = rf"^{re.escape(topic)}#.*"

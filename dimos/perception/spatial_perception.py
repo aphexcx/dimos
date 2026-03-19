@@ -32,8 +32,10 @@ from dimos.agents_deprecated.memory.image_embedding import ImageEmbeddingProvide
 from dimos.agents_deprecated.memory.spatial_vector_db import SpatialVectorDB
 from dimos.agents_deprecated.memory.visual_memory import VisualMemory
 from dimos.constants import DIMOS_PROJECT_ROOT
-from dimos.core import DimosCluster, In, rpc
-from dimos.core.skill_module import SkillModule
+from dimos.core.core import rpc
+from dimos.core.module import Module
+from dimos.core.module_coordinator import ModuleCoordinator
+from dimos.core.stream import In
 from dimos.msgs.sensor_msgs import Image
 from dimos.types.robot_location import RobotLocation
 from dimos.utils.logging_config import setup_logger
@@ -51,9 +53,9 @@ _VISUAL_MEMORY_PATH = _SPATIAL_MEMORY_DIR / "visual_memory.pkl"
 logger = setup_logger()
 
 
-class SpatialMemory(SkillModule):
+class SpatialMemory(Module):
     """
-    A Dask module for building and querying Robot spatial memory.
+    A Dimos module for building and querying Robot spatial memory.
 
     This module processes video frames and odometry data from LCM streams,
     associates them with XY locations, and stores them in a vector database
@@ -198,12 +200,12 @@ class SpatialMemory(SkillModule):
             else:
                 logger.warning("Received image message without data attribute")
 
-        unsub = self.color_image.subscribe(set_video)
-        self._disposables.add(Disposable(unsub))
+        self._disposables.add(Disposable(self.color_image.subscribe(set_video)))
 
         # Start periodic processing using interval
-        unsub = interval(self._process_interval).subscribe(lambda _: self._process_frame())  # type: ignore[assignment]
-        self._disposables.add(Disposable(unsub))
+        self._disposables.add(
+            interval(self._process_interval).subscribe(lambda _: self._process_frame())
+        )
 
     @rpc
     def stop(self) -> None:
@@ -578,7 +580,7 @@ class SpatialMemory(SkillModule):
 
 
 def deploy(  # type: ignore[no-untyped-def]
-    dimos: DimosCluster,
+    dimos: ModuleCoordinator,
     camera: spec.Camera,
 ):
     spatial_memory = dimos.deploy(SpatialMemory, db_path="/tmp/spatial_memory_db")  # type: ignore[attr-defined]

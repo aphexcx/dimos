@@ -45,8 +45,10 @@ _COMMAND_CENTER_DIR = (
     FilePath(__file__).parent.parent / "command-center-extension" / "dist-standalone"
 )
 
-from dimos.core import In, Module, Out, rpc
-from dimos.core.global_config import GlobalConfig
+from dimos.core.core import rpc
+from dimos.core.global_config import GlobalConfig, global_config
+from dimos.core.module import Module
+from dimos.core.stream import In, Out
 from dimos.mapping.occupancy.gradient import gradient
 from dimos.mapping.occupancy.inflation import simple_inflate
 from dimos.mapping.types import LatLon
@@ -98,17 +100,17 @@ class WebsocketVisModule(Module):
     def __init__(
         self,
         port: int = 7779,
-        global_config: GlobalConfig | None = None,
+        cfg: GlobalConfig = global_config,
         **kwargs: Any,
     ) -> None:
         """Initialize the WebSocket visualization module.
 
         Args:
             port: Port to run the web server on
-            global_config: Optional global config for viewer backend settings
+            cfg: Optional global config for viewer settings
         """
         super().__init__(**kwargs)
-        self._global_config = global_config or GlobalConfig()
+        self._global_config = cfg
 
         self.port = port
         self._uvicorn_server_thread: threading.Thread | None = None
@@ -154,8 +156,8 @@ class WebsocketVisModule(Module):
         self._uvicorn_server_thread.start()
 
         # Auto-open browser only for rerun-web (dashboard with Rerun iframe + command center)
-        # For rerun-native and foxglove, users access the command center manually if needed
-        if self._global_config.viewer_backend == "rerun-web":
+        # For rerun and foxglove, users access the command center manually if needed
+        if self._global_config.viewer == "rerun-web":
             url = f"http://localhost:{self.port}/"
             logger.info(f"Dimensional Command Center: {url}")
 
@@ -194,6 +196,10 @@ class WebsocketVisModule(Module):
 
     @rpc
     def stop(self) -> None:
+        if getattr(self, "_ws_stopped", False):
+            return
+        self._ws_stopped = True
+
         if self._uvicorn_server:
             self._uvicorn_server.should_exit = True
 
@@ -228,8 +234,9 @@ class WebsocketVisModule(Module):
         async def serve_index(request):  # type: ignore[no-untyped-def]
             """Serve appropriate HTML based on viewer mode."""
             # If running native Rerun, redirect to standalone command center
-            if self._global_config.viewer_backend == "rerun-native":
+            if self._global_config.viewer != "rerun-web":
                 return RedirectResponse(url="/command-center")
+
             # Otherwise serve full dashboard with Rerun iframe
             return FileResponse(_DASHBOARD_HTML, media_type="text/html")
 
